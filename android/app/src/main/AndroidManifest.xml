@@ -1,4 +1,4 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.example.bauauftrageapp">
     <uses-permission android:name="android.permission.CALL_PHONE"/>
     <application
         android:label="Bauaufträge24"
@@ -24,6 +24,13 @@
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
+            </intent-filter>
+            <!-- App Links -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" android:host="xn--bauauftrge24-ncb.ch" />
             </intent-filter>
         </activity>
         <!-- Don't delete the meta-data below.
