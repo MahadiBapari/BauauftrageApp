@@ -215,7 +215,7 @@ class _EditOrderPageScreenState extends State<EditOrderPageScreen> {
     if (!_formKey.currentState!.validate()) return;
 
     if (_authToken == null) {
-      _showError("Authentication required. Please log in.");
+      _showError("Authentifizierung erforderlich. Bitte melden Sie sich an.");
       return;
     }
 
@@ -230,7 +230,7 @@ class _EditOrderPageScreenState extends State<EditOrderPageScreen> {
       }
     } catch (e) {
       debugPrint('Error uploading new images: $e');
-      _showError("Failed to upload new images. Please try again.");
+      _showError("Fehler beim Hochladen neuer Bilder. Bitte versuchen Sie es erneut.");
       setState(() => _isSubmitting = false);
       return;
     }
@@ -262,12 +262,12 @@ class _EditOrderPageScreenState extends State<EditOrderPageScreen> {
 
       if (response.statusCode == 200) { // HTTP 200 for successful PUT/update
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Order updated successfully!')),
+          const SnackBar(content: Text('Bestellung erfolgreich aktualisiert!')),
         );
         Navigator.of(context).pop(true); // Pop with 'true' to indicate success
       } else {
         final data = jsonDecode(response.body);
-        _showError(data['message'] ?? 'Update failed. Status Code: ${response.statusCode}');
+        _showError(data['message'] ?? 'Aktualisierung fehlgeschlagen. Status Code: ${response.statusCode}');
       }
     } catch (e) {
       _showError('Error: $e');

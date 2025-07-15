@@ -233,13 +233,18 @@ final Map<String, dynamic> postData = {
         _formKey.currentState!.reset();
 
         setState(() {
+          // Clear all text fields
+          _titleController.clear();
+          _streetController.clear();
+          _postalCodeController.clear();
+          _cityController.clear();
+          _descriptionController.clear();
+
           // Clear the selected categories list
           _selectedCategories.clear();
 
-          // Corrected: Clear the _selectedImages list instead of assigning null
-          _selectedImages.clear(); // This is the most common and robust solution
-          // OR if _selectedImages was declared as List<File>?, then:
-          // _selectedImages = null; // This would also be valid if the type is nullable
+          // Clear the selected images list
+          _selectedImages.clear();
         });
 
     // Optionally, you might want to navigate back or to another screen
