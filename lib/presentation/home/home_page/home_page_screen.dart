@@ -171,7 +171,17 @@ class _HomePageScreenState extends State<HomePageScreen> {
   }
 
   Future<void> _onRefresh() async {
-    await _loadInitialData();
+    // Only refresh user, promos, categories, new arrivals, membership (not partners)
+    setState(() => _isLoading = true);
+    await Future.wait([
+      _fetchUser(),
+      _fetchPromoOrders(),
+      _fetchCategories(),
+      _fetchNewArrivalsOrders(),
+      _fetchMembershipStatus(),
+      // _loadPartners(), // Do NOT refresh partners on pull-to-refresh
+    ]);
+    if (mounted) setState(() => _isLoading = false);
   }
 
   Future<void> _loadInitialData() async {
@@ -194,14 +204,14 @@ class _HomePageScreenState extends State<HomePageScreen> {
           });
         }
       }
-      // Load all data in parallel
+      // Load all data in parallel, including partners only on initial load
       await Future.wait([
         _fetchUser(),
         _fetchPromoOrders(),
         _fetchCategories(),
         _fetchNewArrivalsOrders(),
         _fetchMembershipStatus(),
-        _loadPartners(),
+        _loadPartners(), // Only here, not in pull-to-refresh
       ]);
       if (mounted) {
         setState(() => _isLoading = false);
@@ -287,36 +297,24 @@ class _HomePageScreenState extends State<HomePageScreen> {
         
         final List<Map<String, dynamic>> formattedOrders = [];
         for (var order in data) {
-          String imageUrl = '';
-          // Get the first image from the order gallery
-          if (order['meta']?['order_gallery'] != null) {
-            final gallery = order['meta']?['order_gallery'];
-            if (gallery is List && gallery.isNotEmpty) {
-              final firstImage = gallery[0];
-              if (firstImage is Map && firstImage['id'] != null) {
-                final imageId = firstImage['id'];
-                try {
-                  final mediaResponse = await SafeHttp.safeGet(
-                    context,
-                    Uri.parse('https://xn--bauauftrge24-ncb.ch/wp-json/wp/v2/media/$imageId'),
-                    headers: {'X-API-Key': apiKey},
-                  );
-                  
-                  if (mediaResponse.statusCode == 200) {
-                    final mediaData = json.decode(mediaResponse.body);
-                    imageUrl = mediaData['source_url'] ?? mediaData['media_details']?['sizes']?['full']?['source_url'] ?? '';
-                  }
-                } catch (e) {
-                  debugPrint('Error fetching media for ID $imageId: $e');
-                }
-              }
+          String cdnUrl = '';
+          String originalUrl = '';
+          if (order['order_gallery_cdn'] != null &&
+              order['order_gallery_cdn'] is List &&
+              (order['order_gallery_cdn'] as List).isNotEmpty) {
+            final cdnGallery = order['order_gallery_cdn'] as List;
+            final firstCdnImage = cdnGallery[0];
+            if (firstCdnImage is Map) {
+              cdnUrl = firstCdnImage['cdn_url'] ?? '';
+              originalUrl = firstCdnImage['original_url'] ?? '';
             }
           }
 
           formattedOrders.add({
             "displayTitle": order['title']['rendered'] ?? '',
             "displayCategory": order['order_category'] ?? '',
-            "displayImageUrl": imageUrl,
+            "displayImageUrl": cdnUrl,
+            "fallbackImageUrl": originalUrl,
             "fullOrder": order,
           });
         }
@@ -418,36 +416,24 @@ class _HomePageScreenState extends State<HomePageScreen> {
         
         final List<Map<String, dynamic>> formattedOrders = [];
         for (var order in data) {
-          String imageUrl = '';
-          // Get the first image from the order gallery
-          if (order['meta']?['order_gallery'] != null) {
-            final gallery = order['meta']?['order_gallery'];
-            if (gallery is List && gallery.isNotEmpty) {
-              final firstImage = gallery[0];
-              if (firstImage is Map && firstImage['id'] != null) {
-                final imageId = firstImage['id'];
-                try {
-                  final mediaResponse = await SafeHttp.safeGet(
-                    context,
-                    Uri.parse('https://xn--bauauftrge24-ncb.ch/wp-json/wp/v2/media/$imageId'),
-                    headers: {'X-API-Key': apiKey},
-                  );
-                  
-                  if (mediaResponse.statusCode == 200) {
-                    final mediaData = json.decode(mediaResponse.body);
-                    imageUrl = mediaData['source_url'] ?? mediaData['media_details']?['sizes']?['full']?['source_url'] ?? '';
-                  }
-                } catch (e) {
-                  debugPrint('Error fetching media for ID $imageId: $e');
-                }
-              }
+          String cdnUrl = '';
+          String originalUrl = '';
+          if (order['order_gallery_cdn'] != null &&
+              order['order_gallery_cdn'] is List &&
+              (order['order_gallery_cdn'] as List).isNotEmpty) {
+            final cdnGallery = order['order_gallery_cdn'] as List;
+            final firstCdnImage = cdnGallery[0];
+            if (firstCdnImage is Map) {
+              cdnUrl = firstCdnImage['cdn_url'] ?? '';
+              originalUrl = firstCdnImage['original_url'] ?? '';
             }
           }
 
           final formatted = {
             "displayTitle": order['title']['rendered'] ?? '',
             "displayCategory": order['order_category'] ?? '',
-            "displayImageUrl": imageUrl,
+            "displayImageUrl": cdnUrl,
+            "fallbackImageUrl": originalUrl,
             "fullOrder": order,
           };
           debugPrint('Formatted order: $formatted');
@@ -530,31 +516,21 @@ class _HomePageScreenState extends State<HomePageScreen> {
         final List<Partner> partners = [];
         
         for (var partner in data) {
-          String? logoUrl;
-          int? logoId = partner['meta']?['logo']?['id'];
-          
-          if (logoId != null) {
-            try {
-              final mediaResponse = await SafeHttp.safeGet(
-                context,
-                Uri.parse('https://xn--bauauftrge24-ncb.ch/wp-json/wp/v2/media/$logoId'),
-                headers: {'X-API-Key': apiKey},
-              );
-              
-              if (mediaResponse.statusCode == 200) {
-                final mediaData = json.decode(mediaResponse.body);
-                logoUrl = mediaData['source_url'] ?? mediaData['media_details']?['sizes']?['full']?['source_url'];
-              }
-            } catch (e) {
-              debugPrint('Error fetching media for partner logo ID $logoId: $e');
-            }
+          String? logoCdnUrl;
+          String? logoOriginalUrl;
+          int? logoId;
+          if (partner['logo_cdn'] != null && partner['logo_cdn'] is Map) {
+            final logoCdn = partner['logo_cdn'] as Map;
+            logoCdnUrl = logoCdn['cdn_url'] as String?;
+            logoOriginalUrl = logoCdn['original_url'] as String?;
+            logoId = logoCdn['id'] as int?;
           }
-
           partners.add(Partner(
             title: partner['title']['rendered'] ?? '',
             address: partner['partner_address'] ?? '',
             logoId: logoId,
-            logoUrl: logoUrl,
+            logoCdnUrl: logoCdnUrl,
+            logoOriginalUrl: logoOriginalUrl,
           ));
         }
 
@@ -700,7 +676,7 @@ class _HomePageScreenState extends State<HomePageScreen> {
                                 itemBuilder: (context, index) {
                                   final promo = promoOrders[index];
                                   return _buildOrderCard(
-                                      promo["displayTitle"]!, promo["displayCategory"]!, promo["displayImageUrl"]);
+                                      promo["displayTitle"]!, promo["displayCategory"]!, promo["displayImageUrl"], promo["fallbackImageUrl"]);
                                 },
                               ),
                             ),
@@ -790,7 +766,7 @@ class _HomePageScreenState extends State<HomePageScreen> {
     );
   }
 
-  Widget _buildOrderCard(String title, String category, String? imageUrl) {
+  Widget _buildOrderCard(String title, String category, String? imageUrl, String? fallbackImageUrl) {
     return Container(
       width: 280,
       margin: const EdgeInsets.symmetric(horizontal: 4),
@@ -808,7 +784,19 @@ class _HomePageScreenState extends State<HomePageScreen> {
                 child: Image.network(
                   imageUrl,
                   fit: BoxFit.cover,
-                  errorBuilder: (context, error, stackTrace) => Container(color: const Color.fromARGB(255, 153, 153, 153)),
+                  errorBuilder: (context, error, stackTrace) {
+                    // Fallback to original URL if CDN fails
+                    if (fallbackImageUrl != null && fallbackImageUrl.isNotEmpty) {
+                      return Image.network(
+                        fallbackImageUrl,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) {
+                          return Container(color: const Color.fromARGB(255, 153, 153, 153));
+                        },
+                      );
+                    }
+                    return Container(color: const Color.fromARGB(255, 153, 153, 153));
+                  },
                 ),
               ),
             // Full overlay across the whole card
@@ -1248,7 +1236,7 @@ class _HomePageScreenState extends State<HomePageScreen> {
     return InkWell(
       onTap: () {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Tapped on ${partner.title}')),
+          SnackBar(content: Text('Tapped on \\${partner.title}')),
         );
       },
       child: Container(
@@ -1275,19 +1263,35 @@ class _HomePageScreenState extends State<HomePageScreen> {
               return Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  if (partner.logoUrl != null && partner.logoUrl!.isNotEmpty)
+                  if (partner.logoCdnUrl != null && partner.logoCdnUrl!.isNotEmpty)
                     Padding(
                       padding: const EdgeInsets.only(top: 13.0, left: 10, right: 10),
                       child: SizedBox(
                         height: imageHeight,
                         child: Image.network(
-                          partner.logoUrl!,
+                          partner.logoCdnUrl!,
                           fit: BoxFit.contain,
                           width: double.infinity,
-                          errorBuilder: (context, error, stackTrace) => Container(
-                            color: Colors.grey[300],
-                            child: const Icon(Icons.broken_image, size: 48, color: Colors.grey),
-                          ),
+                          errorBuilder: (context, error, stackTrace) {
+                            // Fallback to original URL if CDN fails
+                            if (partner.logoOriginalUrl != null && partner.logoOriginalUrl!.isNotEmpty) {
+                              return Image.network(
+                                partner.logoOriginalUrl!,
+                                fit: BoxFit.contain,
+                                width: double.infinity,
+                                errorBuilder: (context, error, stackTrace) {
+                                  return Container(
+                                    color: Colors.grey[300],
+                                    child: const Icon(Icons.broken_image, size: 48, color: Colors.grey),
+                                  );
+                                },
+                              );
+                            }
+                            return Container(
+                              color: Colors.grey[300],
+                              child: const Icon(Icons.broken_image, size: 48, color: Colors.grey),
+                            );
+                          },
                         ),
                       ),
                     )
@@ -1336,6 +1340,7 @@ class _HomePageScreenState extends State<HomePageScreen> {
     final String title = orderData["displayTitle"]!;
     final String category = orderData["displayCategory"]!;
     final String? imageUrl = orderData["displayImageUrl"];
+    final String? fallbackImageUrl = orderData["fallbackImageUrl"];
     final Map<String, dynamic> fullOrder = orderData["fullOrder"]!;
 
     return InkWell(
@@ -1375,7 +1380,19 @@ class _HomePageScreenState extends State<HomePageScreen> {
                   child: Image.network(
                     imageUrl,
                     fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) => Container(color: Colors.grey[300]),
+                    errorBuilder: (context, error, stackTrace) {
+                      // Fallback to original URL if CDN fails
+                      if (fallbackImageUrl != null && fallbackImageUrl.isNotEmpty) {
+                        return Image.network(
+                          fallbackImageUrl,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) {
+                            return Container(color: Colors.grey[300]);
+                          },
+                        );
+                      }
+                      return Container(color: Colors.grey[300]);
+                    },
                   ),
                 ),
               // Full overlay across the whole card
@@ -1425,13 +1442,15 @@ class Partner {
   final String title;
   final String address;
   final int? logoId;
-  final String? logoUrl;
+  final String? logoCdnUrl;
+  final String? logoOriginalUrl;
 
   Partner({
     required this.title,
     required this.address,
     this.logoId,
-    this.logoUrl,
+    this.logoCdnUrl,
+    this.logoOriginalUrl,
   });
 
   Map<String, dynamic> toJson() {
@@ -1439,7 +1458,8 @@ class Partner {
       'title': title,
       'address': address,
       'logoId': logoId,
-      'logoUrl': logoUrl,
+      'logoCdnUrl': logoCdnUrl,
+      'logoOriginalUrl': logoOriginalUrl,
     };
   }
 
@@ -1448,7 +1468,8 @@ class Partner {
       title: json['title'] as String,
       address: json['address'] as String,
       logoId: json['logoId'] as int?,
-      logoUrl: json['logoUrl'] as String?,
+      logoCdnUrl: json['logoCdnUrl'] as String? ?? (json['logo_cdn']?['cdn_url'] as String?),
+      logoOriginalUrl: json['logoOriginalUrl'] as String? ?? (json['logo_cdn']?['original_url'] as String?),
     );
   }
 }
