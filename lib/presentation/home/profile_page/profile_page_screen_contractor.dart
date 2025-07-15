@@ -285,7 +285,7 @@ class _ProfilePageState extends State<ProfilePageScreenContractor> {
       'first_name': meta['first_name']?[0] ?? '',
       'last_name': meta['last_name']?[0] ?? '',
       'user_phone_': meta['user_phone_']?[0] ?? '',
-      'firmenname_': meta['firmenname_']?[0] ?? '',
+      'firmenname': meta['firmenname']?[0] ?? '',
       'uid_nummer': meta['uid_nummer']?[0] ?? '',
       'available_time': meta['available_time']?[0] ?? '',
       '_service_category_': serviceCategoryIds,
@@ -555,7 +555,7 @@ class _ProfilePageState extends State<ProfilePageScreenContractor> {
                           _buildInfoRow(
                             context,
                             'Firmenname',
-                            _userData!['meta_data']?['firmenname_']?[0] ??
+                            _userData!['meta_data']?['firmenname']?[0] ??
                                 'Kei Firmenname',
                             Icons.business,
                           ),

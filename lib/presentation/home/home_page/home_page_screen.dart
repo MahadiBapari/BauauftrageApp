@@ -234,7 +234,7 @@ class _HomePageScreenState extends State<HomePageScreen> {
         final userData = json.decode(response.body);
         if (mounted) {
           setState(() {
-            displayName = userData['firmenname_'] ?? "";
+            displayName = userData['firmenname'] ?? "";
             isLoadingUser = false;
           });
         }

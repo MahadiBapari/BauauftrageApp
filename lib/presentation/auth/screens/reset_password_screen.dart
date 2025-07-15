@@ -76,12 +76,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color.fromARGB(255, 250, 250, 250),
-      appBar: AppBar(
-        title: const Text('Passwort zurücksetzen'),
-        elevation: 0,
-        backgroundColor: Colors.transparent,
-        foregroundColor: Colors.black,
-      ),
+     
       body: Center(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(16.0),
@@ -157,6 +152,22 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                           onPressed: _resetPassword, 
                           child: const Text('Passwort zurücksetzen', style: TextStyle(fontSize: 18, color: Colors.white, fontWeight: FontWeight.w600)),
                         ),
+                  const SizedBox(height: 16),
+                  GestureDetector(
+                    onTap: () {
+                      Navigator.pushReplacementNamed(context, '/login');
+                    },
+                    child: const Text(
+                      'Anmelden',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: Color.fromARGB(255, 185, 7, 7),
+                        fontWeight: FontWeight.bold,
+                        fontSize: 18,
+                        decoration: TextDecoration.underline,
+                      ),
+                    ),
+                  ),
                   const SizedBox(height: 20),
                   if (_message.isNotEmpty)
                     Text(

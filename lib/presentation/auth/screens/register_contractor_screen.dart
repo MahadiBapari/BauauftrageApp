@@ -59,7 +59,7 @@ class _RegisterContractorPageState extends State<RegisterContractorPage> {
         'X-API-KEY': apiKey,
       }, body: jsonEncode({
         'username': _emailController.text.trim(),
-        'firmenname_': _firmController.text.trim(),
+        'firmenname': _firmController.text.trim(),
         'uid_nummer': _uidController.text.trim(),
         'email': _emailController.text.trim(),
         'first_name': _firstNameController.text.trim(),

@@ -236,7 +236,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                             borderRadius: BorderRadius.circular(8),
                           ),
                         ),
-                        child: const Text('Login', style: TextStyle(color: Colors.white)),
+                        child: const Text('Anmelden', style: TextStyle(color: Colors.white)),
                       ),
                     ),
                     const SizedBox(height: 10),

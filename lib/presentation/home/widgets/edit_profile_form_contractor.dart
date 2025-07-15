@@ -42,7 +42,7 @@ class _EditProfileFormContractorState
     super.initState();
     // Initialize controllers with existing user data
     _phoneController.text = widget.userData['meta_data']?['user_phone_']?[0] ?? '';
-    _firmNameController.text = widget.userData['meta_data']?['firmenname_']?[0] ?? '';
+    _firmNameController.text = widget.userData['meta_data']?['firmenname']?[0] ?? '';
     _uidNumberController.text = widget.userData['meta_data']?['uid_nummer']?[0] ?? '';
     _availableTimeController.text = widget.userData['meta_data']?['available_time']?[0] ?? '';
     _firstNameController.text = widget.userData['meta_data']?['first_name']?[0] ?? '';
@@ -111,7 +111,7 @@ class _EditProfileFormContractorState
         'first_name': _firstNameController.text,
         'last_name': _lastNameController.text,
         'user_phone_': _phoneController.text,
-        'firmenname_': _firmNameController.text,
+        'firmenname': _firmNameController.text,
         'uid_nummer': _uidNumberController.text,
         'available_time': _availableTimeController.text,
         '_service_category_': _selectedServiceCategoryIds.map((id) => int.tryParse(id) ?? 0).where((id) => id > 0).toList(),

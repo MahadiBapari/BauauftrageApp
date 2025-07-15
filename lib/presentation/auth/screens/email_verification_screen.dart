@@ -41,7 +41,7 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
       final data = jsonDecode(res.body);
       if (res.statusCode == 200) {
         setState(() => status = "Email Verified");
-        Future.delayed(const Duration(seconds: 3), () {
+        Future.delayed(const Duration(seconds: 5), () {
           if (mounted) {
             Navigator.pushReplacementNamed(context, '/login');
           }
