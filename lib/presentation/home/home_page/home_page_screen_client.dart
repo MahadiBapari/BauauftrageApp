@@ -350,18 +350,21 @@ class _HomePageScreenClientState extends State<HomePageScreenClient> with Automa
         for (var item in partnersData) {
           final title = item['title']?['rendered'] as String? ?? '';
           final address = item['meta']?['adresse'] as String? ?? '';
-          String? logoUrl;
-          if (item['meta'] != null && 
-              item['meta']['logo'] != null && 
-              item['meta']['logo'] is Map &&
-              item['meta']['logo']['url'] != null) {
-            logoUrl = item['meta']['logo']['url'] as String;
+          String? logoCdnUrl;
+          String? logoOriginalUrl;
+          int? logoId;
+          if (item['logo_cdn'] != null && item['logo_cdn'] is Map) {
+            final logoCdn = item['logo_cdn'] as Map;
+            logoCdnUrl = logoCdn['cdn_url'] as String?;
+            logoOriginalUrl = logoCdn['original_url'] as String?;
+            logoId = logoCdn['id'] as int?;
           }
           fetchedPartners.add(Partner(
             title: title,
             address: address,
-            logoId: item['meta']?['logo']?['id'],
-            logoUrl: logoUrl,
+            logoId: logoId,
+            logoCdnUrl: logoCdnUrl,
+            logoOriginalUrl: logoOriginalUrl,
           ));
         }
         if (mounted) {
@@ -756,10 +759,6 @@ class _HomePageScreenClientState extends State<HomePageScreenClient> with Automa
   }
 
   Widget _buildPartnerCard(Partner partner) {
-    debugPrint('Building partner card for: ${partner.title}');
-    debugPrint('Partner logo URL: ${partner.logoUrl}');
-    debugPrint('Logo URL is empty: ${partner.logoUrl?.isEmpty ?? true}');
-    
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
       child: InkWell(
@@ -786,37 +785,43 @@ class _HomePageScreenClientState extends State<HomePageScreenClient> with Automa
             children: [
               ClipRRect(
                 borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-                child: partner.logoUrl != null && partner.logoUrl!.isNotEmpty
-                      ? ExtendedImage.network(
-                        partner.logoUrl!,
-                        height: 80,
-                        width: 100,
-                        fit: BoxFit.contain,
-                        cache: true,
-                        enableLoadState: true,
-                        loadStateChanged: (state) {
-                        if (state.extendedImageLoadState == LoadState.completed) {
-                          return ExtendedRawImage(
-                          image: state.extendedImageInfo?.image,
+                child: partner.logoCdnUrl != null && partner.logoCdnUrl!.isNotEmpty
+                      ? Image.network(
+                          partner.logoCdnUrl!,
+                          height: 80,
+                          width: 100,
                           fit: BoxFit.contain,
-                          );
-                        } else if (state.extendedImageLoadState == LoadState.failed) {
-                          return Container(
+                          errorBuilder: (context, error, stackTrace) {
+                            if (partner.logoOriginalUrl != null && partner.logoOriginalUrl!.isNotEmpty) {
+                              return Image.network(
+                                partner.logoOriginalUrl!,
+                                height: 80,
+                                width: 100,
+                                fit: BoxFit.contain,
+                                errorBuilder: (context, error, stackTrace) {
+                                  return Container(
+                                    height: 110,
+                                    width: 150,
+                                    color: Colors.grey[200],
+                                    child: const Icon(Icons.business, size: 60, color: Colors.grey),
+                                  );
+                                },
+                              );
+                            }
+                            return Container(
+                              height: 110,
+                              width: 150,
+                              color: Colors.grey[200],
+                              child: const Icon(Icons.business, size: 60, color: Colors.grey),
+                            );
+                          },
+                        )
+                      : Container(
                           height: 110,
                           width: 150,
                           color: Colors.grey[200],
                           child: const Icon(Icons.business, size: 60, color: Colors.grey),
-                          );
-                        }
-                        return null;
-                        },
-                      )
-                    : Container(
-                        height: 110,
-                        width: 150,
-                        color: Colors.grey[200],
-                        child: const Icon(Icons.business, size: 60, color: Colors.grey),
-                      ),
+                        ),
               ),
               const SizedBox(height: 10),
               Padding(
@@ -872,12 +877,27 @@ class _HomePageScreenClientState extends State<HomePageScreenClient> with Automa
           borderRadius: BorderRadius.circular(12),
           child: Stack(
             children: [
-              if (order.imageUrl != null && order.imageUrl!.isNotEmpty)
+              if (order.fullOrder != null &&
+                  order.fullOrder!['order_gallery_cdn'] != null &&
+                  order.fullOrder!['order_gallery_cdn'] is List &&
+                  (order.fullOrder!['order_gallery_cdn'] as List).isNotEmpty)
                 Positioned.fill(
                   child: Image.network(
-                    order.imageUrl!,
+                    order.fullOrder!['order_gallery_cdn'][0]['cdn_url'] ?? '',
                     fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) => Container(color: Colors.grey[300]),
+                    errorBuilder: (context, error, stackTrace) {
+                      final fallbackUrl = order.fullOrder!['order_gallery_cdn'][0]['original_url'] ?? '';
+                      if (fallbackUrl.isNotEmpty) {
+                        return Image.network(
+                          fallbackUrl,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) {
+                            return Container(color: Colors.grey[300]);
+                          },
+                        );
+                      }
+                      return Container(color: Colors.grey[300]);
+                    },
                   ),
                 ),
               // Full overlay across the whole card
@@ -1048,13 +1068,15 @@ class Partner {
   final String title;
   final String address;
   final int? logoId;
-  final String? logoUrl;
+  final String? logoCdnUrl;
+  final String? logoOriginalUrl;
 
   Partner({
     required this.title,
     required this.address,
     this.logoId,
-    this.logoUrl,
+    this.logoCdnUrl,
+    this.logoOriginalUrl,
   });
 
   Map<String, dynamic> toJson() {
@@ -1062,7 +1084,8 @@ class Partner {
       'title': title,
       'address': address,
       'logoId': logoId,
-      'logoUrl': logoUrl,
+      'logoCdnUrl': logoCdnUrl,
+      'logoOriginalUrl': logoOriginalUrl,
     };
   }
 
@@ -1071,7 +1094,8 @@ class Partner {
       title: json['title'] as String,
       address: json['address'] as String,
       logoId: json['logoId'] as int?,
-      logoUrl: json['logoUrl'] as String?,
+      logoCdnUrl: json['logoCdnUrl'] as String? ?? (json['logo_cdn']?['cdn_url'] as String?),
+      logoOriginalUrl: json['logoOriginalUrl'] as String? ?? (json['logo_cdn']?['original_url'] as String?),
     );
   }
 }

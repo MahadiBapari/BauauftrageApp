@@ -73,24 +73,14 @@ class _SingleOrderPageScreenState extends State<SingleOrderPageScreen> {
     }
 
     final authorId = widget.order['author'];
-    final List<dynamic> galleryDynamic = widget.order['meta']?['order_gallery'] ?? [];
+    final List<dynamic> galleryCdn = widget.order['order_gallery_cdn'] ?? [];
     final List<dynamic> rawCategoryIds = widget.order['order-categories'] ?? [];
-
-    List<int> galleryImageIds = galleryDynamic
-    .whereType<Map>()
-    .map((item) => item['id'])
-    .whereType<int>()
-    .toList();
 
     try {
       List<Future<dynamic>> futures = [
         SafeHttp.safeGet(context, Uri.parse('$usersApiBaseUrl$authorId'), headers: {'X-API-KEY': apiKey}),
         SafeHttp.safeGet(context, Uri.parse(categoriesUrl)),
       ];
-
-      for (int mediaId in galleryImageIds) {
-        futures.add(SafeHttp.safeGet(context, Uri.parse('https://xn--bauauftrge24-ncb.ch/wp-json/wp/v2/media/$mediaId'), headers: {'X-API-KEY': apiKey}));
-      }
 
       List<dynamic> responses = await Future.wait(futures);
 
@@ -111,13 +101,13 @@ class _SingleOrderPageScreenState extends State<SingleOrderPageScreen> {
         }
       }
 
+      // Use cdn_url as main, original_url as fallback
       List<String> imageUrls = [];
-      for (int i = 2; i < responses.length; i++) {
-        final mediaResponse = responses[i];
-        if (mediaResponse.statusCode == 200) {
-          final mediaData = jsonDecode(mediaResponse.body);
-          final imageUrl = mediaData['source_url'];
-          if (imageUrl != null) imageUrls.add(imageUrl);
+      for (var img in galleryCdn) {
+        if (img is Map && img['cdn_url'] != null) {
+          imageUrls.add(img['cdn_url']);
+        } else if (img is Map && img['original_url'] != null) {
+          imageUrls.add(img['original_url']);
         }
       }
 
@@ -245,14 +235,7 @@ return Scaffold(
                               },
                               child: Hero(
                                 tag: _imageUrls[index],
-                                child: CachedNetworkImage(
-                                  imageUrl: _imageUrls[index],
-                                  fit: BoxFit.cover,
-                                  placeholder: (_, __) =>
-                                      const Center(child: CircularProgressIndicator()),
-                                  errorWidget: (_, __, ___) =>
-                                      const Icon(Icons.broken_image, size: 40),
-                                ),
+                                child: _buildGalleryImage(index),
                               ),
                             );
                           },
@@ -498,6 +481,35 @@ return Scaffold(
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildGalleryImage(int index) {
+    final cdnUrl = (widget.order['order_gallery_cdn'] != null &&
+            widget.order['order_gallery_cdn'] is List &&
+            (widget.order['order_gallery_cdn'] as List).length > index)
+        ? (widget.order['order_gallery_cdn'][index]['cdn_url'] ?? '')
+        : '';
+    final originalUrl = (widget.order['order_gallery_cdn'] != null &&
+            widget.order['order_gallery_cdn'] is List &&
+            (widget.order['order_gallery_cdn'] as List).length > index)
+        ? (widget.order['order_gallery_cdn'][index]['original_url'] ?? '')
+        : '';
+    return Image.network(
+      cdnUrl.isNotEmpty ? cdnUrl : originalUrl,
+      fit: BoxFit.cover,
+      errorBuilder: (context, error, stackTrace) {
+        if (originalUrl.isNotEmpty && cdnUrl != originalUrl) {
+          return Image.network(
+            originalUrl,
+            fit: BoxFit.cover,
+            errorBuilder: (context, error, stackTrace) {
+              return const Icon(Icons.broken_image, size: 40);
+            },
+          );
+        }
+        return const Icon(Icons.broken_image, size: 40);
+      },
     );
   }
 }

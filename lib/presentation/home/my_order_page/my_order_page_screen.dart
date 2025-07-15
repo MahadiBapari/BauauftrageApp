@@ -207,65 +207,23 @@ class _MyOrdersPageScreenState extends State<MyOrdersPageScreen> {
         final List<dynamic> data = jsonDecode(response.body);
         debugPrint('MyOrdersPageScreen: Raw data length: [32m${data.length}[0m');
         for (var order in data) {
-          debugPrint('Fetched order with id: [36m${order['id']}[0m, author: [33m${order['author']}[0m');
-          String imageUrl = '';
-          final dynamic galleryDynamic = order['meta']?['order_gallery'];
-          List<dynamic> galleryList = [];
-
-          // Start of FIX for 'List<dynamic>' to 'String' error
-          if (galleryDynamic is List) {
-            galleryList = galleryDynamic;
-          } else if (galleryDynamic is String) {
-            try {
-              final decodedContent = jsonDecode(galleryDynamic);
-              if (decodedContent is List) {
-                galleryList = decodedContent;
-              } else {
-                debugPrint('MyOrdersPageScreen: galleryDynamic is a String, but not a JSON list: $galleryDynamic');
-              }
-            } catch (e) {
-              debugPrint('MyOrdersPageScreen: Could not parse gallery string as JSON: $e, original string: $galleryDynamic');
-            }
-          } else {
-            debugPrint('MyOrdersPageScreen: order_gallery is neither List nor String type: ${galleryDynamic.runtimeType}');
-          }
-          // End of FIX for 'List<dynamic>' to 'String' error
-
-
-          if (galleryList.isNotEmpty) {
-            dynamic firstItem = galleryList[0];
-            int? firstImageId;
-
-            if (firstItem is Map && firstItem.containsKey('id') && firstItem['id'] is int) {
-              firstImageId = firstItem['id'];
-            } else if (firstItem is int) {
-              firstImageId = firstItem;
-            } else if (firstItem is String) {
-              firstImageId = int.tryParse(firstItem);
-            }
-
-            if (firstImageId != null) {
-              final mediaUrl = '$mediaEndpointBase$firstImageId';
-              final mediaResponse = await SafeHttp.safeGet(context, Uri.parse(mediaUrl));
-
-              if (!mounted) {
-                debugPrint('MyOrdersPageScreen: _fetchOrders: Widget unmounted during media API call.');
-                return;
-              }
-
-              if (mediaResponse.statusCode == 200) {
-                try {
-                  final mediaData = jsonDecode(mediaResponse.body);
-                  imageUrl = mediaData['source_url'] ?? mediaData['media_details']?['sizes']?['full']?['source_url'] ?? '';
-                } catch (e) {
-                  debugPrint('MyOrdersPageScreen: Error decoding media data for ID $firstImageId: $e');
-                }
-              } else {
-                debugPrint('MyOrdersPageScreen: Failed to fetch media for ID $firstImageId: ${mediaResponse.statusCode}');
-              }
+          debugPrint('Fetched order with id: \u001b[36m[0m, author: \u001b[33m[0m');
+          // --- BEGIN CDN IMAGE LOGIC ---
+          String cdnUrl = '';
+          String originalUrl = '';
+          if (order['order_gallery_cdn'] != null &&
+              order['order_gallery_cdn'] is List &&
+              (order['order_gallery_cdn'] as List).isNotEmpty) {
+            final cdnGallery = order['order_gallery_cdn'] as List;
+            final firstCdnImage = cdnGallery[0];
+            if (firstCdnImage is Map) {
+              cdnUrl = firstCdnImage['cdn_url'] ?? '';
+              originalUrl = firstCdnImage['original_url'] ?? '';
             }
           }
-          order['imageUrl'] = imageUrl;
+          order['displayImageUrl'] = cdnUrl;
+          order['fallbackImageUrl'] = originalUrl;
+          // --- END CDN IMAGE LOGIC ---
           currentFetchedOrders.add(order);
         }
 
@@ -497,7 +455,8 @@ class _MyOrdersPageScreenState extends State<MyOrdersPageScreen> {
                                 }
 
                                 final order = _filteredOrders[index];
-                                final imageUrl = order['imageUrl'] ?? '';
+                                final imageUrl = order['displayImageUrl'] ?? '';
+                                final fallbackImageUrl = order['fallbackImageUrl'] ?? '';
                                 final title = order['title']['rendered'] ?? 'Untitled';
                                 //final categoryName = order['acf']?['category'] ?? 'N/A';
 
@@ -533,7 +492,17 @@ class _MyOrdersPageScreenState extends State<MyOrdersPageScreen> {
                                               child: Image.network(
                                                 imageUrl,
                                                 fit: BoxFit.cover,
-                                                errorBuilder: (context, error, stackTrace) => Container(color: Colors.grey[300]),
+                                                errorBuilder: (context, error, stackTrace) {
+                                                  // Fallback to original URL if CDN fails
+                                                  if (fallbackImageUrl.isNotEmpty) {
+                                                    return Image.network(
+                                                      fallbackImageUrl,
+                                                      fit: BoxFit.cover,
+                                                      errorBuilder: (context, error, stackTrace) => Container(color: Colors.grey[300]),
+                                                    );
+                                                  }
+                                                  return Container(color: Colors.grey[300]);
+                                                },
                                               ),
                                             ),
                                           // Full overlay across the whole card

@@ -248,57 +248,20 @@ class _AllOrdersPageScreenState extends State<AllOrdersPageScreen> {
         debugPrint('AllOrdersPageScreen: Raw data length: ${data.length}');
 
         for (var order in data) {
-          String imageUrl = '';
-          dynamic galleryDynamic = order['meta']?['order_gallery']; // Can be List or String
-
-          List<dynamic> galleryList = [];
-          if (galleryDynamic is List) {
-            galleryList = galleryDynamic;
-          } else if (galleryDynamic is String) {
-            try {
-              final decodedContent = jsonDecode(galleryDynamic);
-              if (decodedContent is List) {
-                galleryList = decodedContent;
-              }
-            } catch (e) {
-              debugPrint('AllOrdersPageScreen: Could not parse gallery string: $e');
+          String cdnUrl = '';
+          String originalUrl = '';
+          if (order['order_gallery_cdn'] != null &&
+              order['order_gallery_cdn'] is List &&
+              (order['order_gallery_cdn'] as List).isNotEmpty) {
+            final cdnGallery = order['order_gallery_cdn'] as List;
+            final firstCdnImage = cdnGallery[0];
+            if (firstCdnImage is Map) {
+              cdnUrl = firstCdnImage['cdn_url'] ?? '';
+              originalUrl = firstCdnImage['original_url'] ?? '';
             }
           }
-
-          if (galleryList.isNotEmpty) {
-            dynamic firstItem = galleryList[0];
-            int? firstImageId;
-
-            if (firstItem is Map && firstItem.containsKey('id') && firstItem['id'] is int) {
-              firstImageId = firstItem['id'];
-            } else if (firstItem is int) {
-              firstImageId = firstItem;
-            } else if (firstItem is String) {
-              firstImageId = int.tryParse(firstItem);
-            }
-
-            if (firstImageId != null) {
-              final mediaUrl = '$mediaEndpointBase$firstImageId';
-              final mediaResponse = await SafeHttp.safeGet(context, Uri.parse(mediaUrl));
-
-              if (!mounted) {
-                debugPrint('AllOrdersPageScreen: Widget unmounted during media API call.');
-                return;
-              }
-
-              if (mediaResponse.statusCode == 200) {
-                try {
-                  final mediaData = jsonDecode(mediaResponse.body);
-                  imageUrl = mediaData['source_url'] ?? mediaData['media_details']?['sizes']?['full']?['source_url'] ?? '';
-                } catch (e) {
-                  debugPrint('AllOrdersPageScreen: Error decoding media data for ID $firstImageId: $e');
-                }
-              } else {
-                debugPrint('AllOrdersPageScreen: Failed to fetch media for ID $firstImageId: ${mediaResponse.statusCode}');
-              }
-            }
-          }
-          order['imageUrl'] = imageUrl;
+          order['imageUrl'] = cdnUrl;
+          order['fallbackImageUrl'] = originalUrl;
           currentFetchedOrders.add(order);
         }
 
@@ -754,7 +717,19 @@ class _AllOrdersPageScreenState extends State<AllOrdersPageScreen> {
                                               child: Image.network(
                                                 imageUrl,
                                                 fit: BoxFit.cover,
-                                                errorBuilder: (context, error, stackTrace) => Container(color: Colors.grey[300]),
+                                                errorBuilder: (context, error, stackTrace) {
+                                                  final fallbackImageUrl = order['fallbackImageUrl'] ?? '';
+                                                  if (fallbackImageUrl.isNotEmpty) {
+                                                    return Image.network(
+                                                      fallbackImageUrl,
+                                                      fit: BoxFit.cover,
+                                                      errorBuilder: (context, error, stackTrace) {
+                                                        return Container(color: Colors.grey[300]);
+                                                      },
+                                                    );
+                                                  }
+                                                  return Container(color: Colors.grey[300]);
+                                                },
                                               ),
                                             ),
                                           // Full overlay across the whole card
