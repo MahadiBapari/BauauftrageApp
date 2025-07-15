@@ -220,26 +220,38 @@ class _HomePageScreenState extends State<HomePageScreen> {
     try {
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString('auth_token');
-      if (token == null) return;
+      final userId = prefs.getString('user_id');
+      if (token == null || userId == null) return;
 
       final response = await SafeHttp.safeGet(
         context,
-        Uri.parse('https://xn--bauauftrge24-ncb.ch/wp-json/wp/v2/users/me'),
+        Uri.parse('https://xn--bauauftrge24-ncb.ch/wp-json/custom-api/v1/users/$userId'),
         headers: {
           'Authorization': 'Bearer $token',
+          'X-API-Key': '1234567890abcdef',
         },
       );
 
       if (response.statusCode == 200) {
         final userData = json.decode(response.body);
+        String firmName = "";
+        if (userData['meta_data'] != null &&
+            userData['meta_data']['firmenname'] != null &&
+            userData['meta_data']['firmenname'] is List &&
+            userData['meta_data']['firmenname'].isNotEmpty) {
+          firmName = userData['meta_data']['firmenname'][0] ?? "";
+        }
+        if (firmName.isEmpty) {
+          firmName = userData['display_name'] ?? "";
+        }
         if (mounted) {
           setState(() {
-            displayName = userData['firmenname'] ?? "";
+            displayName = firmName;
             isLoadingUser = false;
           });
         }
         // Cache the user data
-        await _cacheManager.saveToCache('user_data', displayName);
+        await _cacheManager.saveToCache('user_data', firmName);
       }
     } catch (e) {
       debugPrint('Error fetching user: $e');
@@ -308,6 +320,9 @@ class _HomePageScreenState extends State<HomePageScreen> {
             "fullOrder": order,
           });
         }
+
+        // Shuffle the promo orders for random display
+        formattedOrders.shuffle();
 
         debugPrint('Formatted promo orders length: ${formattedOrders.length}');
 
@@ -680,7 +695,7 @@ class _HomePageScreenState extends State<HomePageScreen> {
                               height: 160,
                               child: ListView.separated(
                                 scrollDirection: Axis.horizontal,
-                                itemCount: promoOrders.length,
+                                itemCount: promoOrders.length > 6 ? 6 : promoOrders.length,
                                 separatorBuilder: (context, index) => const SizedBox(width: 14),
                                 itemBuilder: (context, index) {
                                   final promo = promoOrders[index];
@@ -721,7 +736,7 @@ class _HomePageScreenState extends State<HomePageScreen> {
                               height: 220,
                               child: ListView.separated(
                                 scrollDirection: Axis.horizontal,
-                                itemCount: _filteredNewArrivalsOrders.length,
+                                itemCount: _filteredNewArrivalsOrders.length > 6 ? 6 : _filteredNewArrivalsOrders.length,
                                 separatorBuilder: (_, __) => const SizedBox(width: 14),
                                 itemBuilder: (context, index) {
                                   final orderData = _filteredNewArrivalsOrders[index];
