@@ -174,7 +174,13 @@ class _HomePageScreenClientState extends State<HomePageScreenClient> with Automa
   }
 
   Future<void> _onRefresh() async {
-    await _refreshAllData();
+    setState(() {
+      _isLoadingOrders = true;
+    });
+    await _loadOrders(forceRefresh: true);
+    setState(() {
+      _isLoadingOrders = false;
+    });
   }
 
   Future<void> _fetchUser({bool forceRefresh = false}) async {
@@ -212,24 +218,26 @@ class _HomePageScreenClientState extends State<HomePageScreenClient> with Automa
       if (!mounted) return;
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        final metaData = data['meta_data'];
-        final List<dynamic>? firstNameList = metaData?['first_name'];
-        final List<dynamic>? lastNameList = metaData?['last_name'];
-        final firstName = (firstNameList != null && firstNameList.isNotEmpty) ? firstNameList[0] : '';
-        final lastName = (lastNameList != null && lastNameList.isNotEmpty) ? lastNameList[0] : '';
-        final newDisplayName = '${firstName.trim()} ${lastName.trim()}'.trim().isEmpty
-            ? 'User'
-            : '${firstName.trim()} ${lastName.trim()}';
+        String firmName = "";
+        if (data['meta_data'] != null &&
+            data['meta_data']['firmenname'] != null &&
+            data['meta_data']['firmenname'] is List &&
+            data['meta_data']['firmenname'].isNotEmpty) {
+          firmName = data['meta_data']['firmenname'][0] ?? "";
+        }
+        if (firmName.isEmpty) {
+          firmName = data['display_name'] ?? "";
+        }
         if (mounted) {
           setState(() {
-            displayName = newDisplayName;
+            displayName = firmName;
+            isLoadingUser = false;
           });
         }
-        await _cacheManager.saveToCache('user_data', newDisplayName);
+        await _cacheManager.saveToCache('user_data', firmName);
       }
     } catch (e) {
       debugPrint('Error fetching user data: $e');
-    } finally {
       if (mounted) setState(() => isLoadingUser = false);
     }
   }
@@ -263,49 +271,9 @@ class _HomePageScreenClientState extends State<HomePageScreenClient> with Automa
       if (!mounted) return;
       if (response.statusCode == 200) {
         List<dynamic> categoriesData = json.decode(response.body);
-        List<_CategoryTemp> tempCategories = [];
-        Set<int> mediaIds = {};
-        for (var item in categoriesData) {
-          if (item['id'] == null ||
-              (item['id'] is! int && int.tryParse(item['id'].toString()) == null)) {
-            continue;
-          }
-          final id = item['id'] is int ? item['id'] : int.parse(item['id'].toString());
-          final name = item['name'] as String;
-          int? imageMediaId;
-          final catImage = item['meta']?['cat_image'];
-          if (catImage != null && catImage is Map && catImage['id'] != null) {
-            if (catImage['id'] is int) {
-              imageMediaId = catImage['id'];
-            } else if (catImage['id'] is String && int.tryParse(catImage['id']) != null) {
-              imageMediaId = int.parse(catImage['id']);
-            }
-            if (imageMediaId != null) mediaIds.add(imageMediaId);
-          }
-          tempCategories.add(_CategoryTemp(id: id, name: name, imageMediaId: imageMediaId));
-        }
-        Map<int, String> mediaUrlMap = {};
-        await Future.wait(mediaIds.map((mediaId) async {
-          try {
-            final mediaResponse = await SafeHttp.safeGet(
-                context,
-                Uri.parse('https://xn--bauauftrge24-ncb.ch/wp-json/wp/v2/media/$mediaId'),
-                headers: {'X-API-Key': apiKey});
-            if (mediaResponse.statusCode == 200) {
-              final mediaData = json.decode(mediaResponse.body);
-              if (mediaData['source_url'] != null) {
-                mediaUrlMap[mediaId] = mediaData['source_url'];
-              }
-            }
-          } catch (e) {}
-        }));
-        List<Category> fetchedCategories = tempCategories
-            .map((c) => Category(
-                  id: c.id,
-                  name: c.name,
-                  imageUrl: c.imageMediaId != null ? mediaUrlMap[c.imageMediaId!] : null,
-                ))
-            .toList();
+        List<Category> fetchedCategories = categoriesData.map((item) {
+          return Category.fromJson(item as Map<String, dynamic>);
+        }).toList();
         if (mounted) {
           setState(() {
             _categories = fetchedCategories;
@@ -412,7 +380,7 @@ class _HomePageScreenClientState extends State<HomePageScreenClient> with Automa
       }
 
       // Always fetch fresh data if forceRefresh is true or cache is empty
-      final response = await SafeHttp.safeGet(context, Uri.parse('https://xn--bauauftrge24-ncb.ch/wp-json/wp/v2/client-order?_embed'));
+      final response = await SafeHttp.safeGet(context, Uri.parse('https://xn--bauauftrge24-ncb.ch/wp-json/wp/v2/client-order'));
 
       if (!mounted) return;
 
@@ -425,33 +393,15 @@ class _HomePageScreenClientState extends State<HomePageScreenClient> with Automa
           final description = item['content']?['rendered'] as String? ?? '';
           final status = item['acf']?['status'] as String? ?? '';
           final date = item['date'] as String? ?? '';
-          String? imageUrl;
-
-          // Get the first image from the order gallery
-          if (item['meta']?['order_gallery'] != null) {
-            final gallery = item['meta']?['order_gallery'];
-            if (gallery is List && gallery.isNotEmpty) {
-              final firstImage = gallery[0];
-              if (firstImage is Map && firstImage['id'] != null) {
-                final imageId = firstImage['id'];
-                try {
-                  final mediaResponse = await SafeHttp.safeGet(context, Uri.parse('https://xn--bauauftrge24-ncb.ch/wp-json/wp/v2/media/$imageId'), headers: {'X-API-KEY': apiKey});
-                  if (mediaResponse.statusCode == 200) {
-                    final mediaData = json.decode(mediaResponse.body);
-                    imageUrl = mediaData['source_url'];
-                  }
-                } catch (e) {}
-              }
-            }
-          }
-
+          // Pass through order_gallery_cdn in fullOrder
+          final fullOrder = Map<String, dynamic>.from(item);
           fetchedOrders.add(Order(
             title: title,
             description: description,
             status: status,
             date: date,
-            imageUrl: imageUrl,
-            fullOrder: item, // Store the complete order data for navigation
+            imageUrl: null, // Not used, handled in _buildOrderCard
+            fullOrder: fullOrder,
           ));
         }
 
@@ -504,7 +454,7 @@ class _HomePageScreenClientState extends State<HomePageScreenClient> with Automa
               child: ListView(
                 children: [
                   // Welcome Section with Shimmer
-                  isLoadingUser
+                  isLoadingUser && displayName == "User"
                       ? Shimmer.fromColors(
                           baseColor: Colors.grey[300]!,
                           highlightColor: Colors.grey[100]!,
@@ -550,8 +500,27 @@ class _HomePageScreenClientState extends State<HomePageScreenClient> with Automa
                     ),
                   ),
                   const SizedBox(height: 6),
-                  _isLoadingCategories
-                      ? _buildCategoryShimmer()
+                  _isLoadingCategories && _categories.isEmpty
+                      ? SizedBox(
+                          height: 120,
+                          child: ListView.separated(
+                            scrollDirection: Axis.horizontal,
+                            itemCount: 5,
+                            separatorBuilder: (_, __) => const SizedBox(width: 10),
+                            itemBuilder: (context, index) => Shimmer.fromColors(
+                              baseColor: Colors.grey[300]!,
+                              highlightColor: Colors.grey[100]!,
+                              child: Container(
+                                width: 100,
+                                height: 100,
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                              ),
+                            ),
+                          ),
+                        )
                       : _categories.isEmpty
                           ? const Center(child: Text('Kei Kategorie verfügbar oder Ladefehler.'))
                           : SizedBox(
@@ -559,7 +528,7 @@ class _HomePageScreenClientState extends State<HomePageScreenClient> with Automa
                               child: ListView.separated(
                                 scrollDirection: Axis.horizontal,
                                 itemCount: _categories.length,
-                                separatorBuilder: (context, index) => const SizedBox(width: 12),
+                                separatorBuilder: (context, index) => const SizedBox(width: 10),
                                 itemBuilder: (context, index) {
                                   final category = _categories[index];
                                   return _buildCategoryCard(category);
@@ -598,8 +567,26 @@ class _HomePageScreenClientState extends State<HomePageScreenClient> with Automa
                     ],
                   ),
                   const SizedBox(height: 6),
-                  _isLoadingPartners
-                      ? _buildPartnerShimmer()
+                  _isLoadingPartners && _partners.isEmpty
+                      ? SizedBox(
+                          height: 180,
+                          child: ListView.separated(
+                            scrollDirection: Axis.horizontal,
+                            itemCount: 4,
+                            separatorBuilder: (_, __) => const SizedBox(width: 14),
+                            itemBuilder: (context, index) => Shimmer.fromColors(
+                              baseColor: Colors.grey[300]!,
+                              highlightColor: Colors.grey[100]!,
+                              child: Container(
+                                width: 150,
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(16),
+                                ),
+                              ),
+                            ),
+                          ),
+                        )
                       : _partners.isEmpty
                           ? const Center(child: Text('Kei Partner verfügbar'))
                           : SizedBox(
@@ -625,8 +612,24 @@ class _HomePageScreenClientState extends State<HomePageScreenClient> with Automa
                     ),
                   ),
                   const SizedBox(height: 6),
-                  _isLoadingOrders
-                      ? _buildOrderShimmer()
+                  _isLoadingOrders && _orders.isEmpty
+                      ? ListView.separated(
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          itemCount: 3,
+                          separatorBuilder: (context, index) => const SizedBox(height: 12),
+                          itemBuilder: (context, index) => Shimmer.fromColors(
+                            baseColor: Colors.grey[300]!,
+                            highlightColor: Colors.grey[100]!,
+                            child: Container(
+                              height: 100,
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                            ),
+                          ),
+                        )
                       : _orders.isEmpty
                           ? Center(
                               child: Column(
@@ -675,21 +678,21 @@ class _HomePageScreenClientState extends State<HomePageScreenClient> with Automa
   }
 
   Widget _buildCategoryCard(Category category) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
-      child: InkWell(
-        onTap: () {
-          widget.onCategorySelected?.call(category.id.toString());
-        },
-        child: Material(
-          elevation: 0,
-          borderRadius: BorderRadius.circular(16),
-          child: Container(
-            width: 100,
-            decoration: BoxDecoration(
-              color: const Color.fromARGB(255, 255, 253, 250),
-              borderRadius: BorderRadius.circular(12),
-              boxShadow: [
+    final cdnUrl = category.catImageCdn?['cdn_url'] as String?;
+    final originalUrl = category.catImageCdn?['original_url'] as String?;
+    return InkWell(
+      onTap: () {
+        widget.onCategorySelected?.call(category.id.toString());
+      },
+      child: Material(
+        elevation: 0,
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          width: 100,
+          decoration: BoxDecoration(
+            color: const Color.fromARGB(255, 255, 253, 250),
+            borderRadius: BorderRadius.circular(12),
+            boxShadow: [
               BoxShadow(
                 color: const Color.fromARGB(255, 59, 59, 59).withOpacity(0.15),
                 blurRadius: 8,
@@ -697,61 +700,88 @@ class _HomePageScreenClientState extends State<HomePageScreenClient> with Automa
                 offset: const Offset(0, 4),
               ),
             ],
-            ),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                if (category.imageUrl != null)
-                  ClipRRect(
-                    borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-                    child: ExtendedImage.network(
-                      category.imageUrl!,
-                      height: 60,
-                      width: 100,
-                      fit: BoxFit.cover,
-                      cache: true,
-                      enableLoadState: true,
-                      loadStateChanged: (state) {
-                        if (state.extendedImageLoadState == LoadState.completed) {
-                          return ExtendedRawImage(
-                            image: state.extendedImageInfo?.image,
-                            fit: BoxFit.cover,
-                          );
-                        } else if (state.extendedImageLoadState == LoadState.failed) {
-                          return Container(
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              if (cdnUrl != null && cdnUrl.isNotEmpty)
+                ClipRRect(
+                  borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+                  child: Image.network(
+                    cdnUrl,
+                    height: 60,
+                    width: 100,
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) {
+                      if (originalUrl != null && originalUrl.isNotEmpty) {
+                        return Image.network(
+                          originalUrl,
+                          height: 60,
+                          width: 100,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) => Container(
                             height: 60,
                             width: 100,
                             color: Colors.grey[200],
                             child: const Icon(Icons.category, color: Colors.grey),
-                          );
-                        }
-                        return null;
-                      },
-                    ),
-                  )
-                else
-                  Container(
+                          ),
+                        );
+                      }
+                      return Container(
+                        height: 60,
+                        width: 100,
+                        color: Colors.grey[200],
+                        child: const Icon(Icons.category, color: Colors.grey),
+                      );
+                    },
+                  ),
+                )
+              else if (originalUrl != null && originalUrl.isNotEmpty)
+                ClipRRect(
+                  borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+                  child: Image.network(
+                    originalUrl,
                     height: 60,
                     width: 100,
-                    color: Colors.grey[200],
-                    child: const Icon(Icons.category, color: Colors.grey),
-                  ),
-                const SizedBox(height: 8),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 8.0),
-                  child: Text(
-                    category.name,
-                    textAlign: TextAlign.center,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w500,
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) => Container(
+                      height: 60,
+                      width: 100,
+                      color: Colors.grey[200],
+                      child: const Icon(Icons.category, color: Colors.grey),
                     ),
                   ),
+                )
+              else if (category.imageUrl != null)
+                ClipRRect(
+                  borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+                  child: Image.network(
+                    category.imageUrl!,
+                    height: 60,
+                    width: 100,
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) => Container(
+                      height: 60,
+                      width: 100,
+                      color: Colors.grey[200],
+                      child: const Icon(Icons.category, color: Colors.grey),
+                    ),
+                  ),
+                )
+              else
+                Container(
+                  height: 60,
+                  width: 100,
+                  color: Colors.grey[200],
+                  child: const Icon(Icons.category, color: Colors.grey),
                 ),
-              ],
-            ),
+              const SizedBox(height: 8),
+              Text(
+                category.name,
+                style: const TextStyle(fontWeight: FontWeight.w500),
+                textAlign: TextAlign.center,
+              ),
+            ],
           ),
         ),
       ),
@@ -850,18 +880,6 @@ class _HomePageScreenClientState extends State<HomePageScreenClient> with Automa
       onTap: () async {
         debugPrint('Order card tapped. fullOrder: \\${order.fullOrder}');
         if (order.fullOrder != null) {
-          debugPrint('Navigating to SingleMyOrderPageScreen with order: \\${order.fullOrder}');
-          final result = await Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => SingleMyOrderPageScreen(order: order.fullOrder!),
-            ),
-          );
-          if (result == true) {
-            // Order was deleted, refresh orders
-            await _refreshAllData(); // or await _loadOrders();
-          }
-        } else {
           debugPrint('Order fullOrder is null, not navigating.');
         }
       },
@@ -943,76 +961,6 @@ class _HomePageScreenClientState extends State<HomePageScreenClient> with Automa
     );
   }
 
-  Widget _buildCategoryShimmer() {
-    return SizedBox(
-      height: 120,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        itemCount: 5,
-        separatorBuilder: (context, index) => const SizedBox(width: 12),
-        itemBuilder: (context, index) {
-          return Shimmer.fromColors(
-            baseColor: Colors.grey[300]!,
-            highlightColor: Colors.grey[100]!,
-            child: Container(
-              width: 100,
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-          );
-        },
-      ),
-    );
-  }
-
-  Widget _buildPartnerShimmer() {
-    return SizedBox(
-      height: 180,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        itemCount: 3,
-        separatorBuilder: (context, index) => const SizedBox(width: 14),
-        itemBuilder: (context, index) {
-          return Shimmer.fromColors(
-            baseColor: Colors.grey[300]!,
-            highlightColor: Colors.grey[100]!,
-            child: Container(
-              width: 150,
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
-              ),
-            ),
-          );
-        },
-      ),
-    );
-  }
-
-  Widget _buildOrderShimmer() {
-    return ListView.separated(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      itemCount: 3,
-      separatorBuilder: (context, index) => const SizedBox(height: 12),
-      itemBuilder: (context, index) {
-        return Shimmer.fromColors(
-          baseColor: Colors.grey[300]!,
-          highlightColor: Colors.grey[100]!,
-          child: Container(
-            height: 100,
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(16),
-            ),
-          ),
-        );
-      },
-    );
-  }
-
   Color _getStatusColor(String status) {
     switch (status.toLowerCase()) {
       case 'pending':
@@ -1033,11 +981,13 @@ class Category {
   final int id;
   final String name;
   final String? imageUrl;
+  final Map<String, dynamic>? catImageCdn;
 
   Category({
     required this.id,
     required this.name,
     this.imageUrl,
+    this.catImageCdn,
   });
 
   Map<String, dynamic> toJson() {
@@ -1045,6 +995,7 @@ class Category {
       'id': id,
       'name': name,
       'imageUrl': imageUrl,
+      'cat_image_cdn': catImageCdn,
     };
   }
 
@@ -1057,9 +1008,10 @@ class Category {
       safeId = int.tryParse(rawId);
     }
     return Category(
-      id: safeId ?? 0, // Use 0 if id is null or not convertible
+      id: safeId ?? 0,
       name: json['name'] as String,
       imageUrl: json['imageUrl'] as String?,
+      catImageCdn: json['cat_image_cdn'] as Map<String, dynamic>?,
     );
   }
 }
