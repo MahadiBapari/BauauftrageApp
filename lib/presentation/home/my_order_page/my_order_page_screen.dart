@@ -9,6 +9,7 @@ import '../my_order_page/single_myorders_page_screen.dart'; // Ensure this is im
 import '../../../widgets/custom_loading_indicator.dart';
 import '../../../utils/cache_manager.dart'; // Assuming you have this Utility
 import 'package:bauauftrage/common/utils/auth_utils.dart';
+import 'package:shimmer/shimmer.dart';
 
 class MyOrdersPageScreen extends StatefulWidget {
   const MyOrdersPageScreen({super.key});
@@ -20,7 +21,6 @@ class MyOrdersPageScreen extends StatefulWidget {
 class _MyOrdersPageScreenState extends State<MyOrdersPageScreen> {
   // Loading states
   bool _isLoadingOrders = true;
-  bool _isFetchingMore = false; // To track if more orders are being fetched
 
   // Data lists
   List<Map<String, dynamic>> _orders = []; // Stores raw fetched orders with image URLs
@@ -29,13 +29,7 @@ class _MyOrdersPageScreenState extends State<MyOrdersPageScreen> {
   // Filter/Search states
   String _searchText = ''; // Re-added: Needed for search
 
-  // Pagination states
-  int _currentPage = 1;
-  final int _perPage = 10;
-  bool _hasMoreOrders = true; // To check if there are more pages to load
-
-  // Scroll controller for pagination
-  final ScrollController _scrollController = ScrollController();
+  // No pagination, so no scroll controller needed
 
   // API constants
   final String ordersEndpoint = 'https://xn--bauauftrge24-ncb.ch/wp-json/wp/v2/client-order';
@@ -52,13 +46,10 @@ class _MyOrdersPageScreenState extends State<MyOrdersPageScreen> {
   void initState() {
     super.initState();
     _loadOrdersFromCacheThenBackground();
-    _scrollController.addListener(_scrollListener); // Add listener for pagination
   }
 
   @override
   void dispose() {
-    _scrollController.removeListener(_scrollListener);
-    _scrollController.dispose();
     super.dispose();
   }
 
@@ -69,7 +60,6 @@ class _MyOrdersPageScreenState extends State<MyOrdersPageScreen> {
     if (_userId == null) {
       setState(() {
         _isLoadingOrders = false;
-        _hasMoreOrders = false;
       });
       _showErrorDialog("User Not Logged In", "Please log in to view your orders.");
       return;
@@ -88,14 +78,7 @@ class _MyOrdersPageScreenState extends State<MyOrdersPageScreen> {
     _loadAllData();
   }
 
-  // Listener for scroll events to trigger pagination
-  void _scrollListener() {
-    if (_scrollController.position.pixels == _scrollController.position.maxScrollExtent && !_isFetchingMore && _hasMoreOrders) {
-      _loadMoreOrders();
-    }
-  }
-
-  // Combines all initial data fetching operations using Future.wait
+  // Loads all orders at once (no pagination)
   Future<void> _loadAllData() async {
     if (_userId == null) {
       debugPrint("MyOrdersPageScreen: _loadAllData called with null userId. Aborting fetch.");
@@ -132,8 +115,8 @@ class _MyOrdersPageScreenState extends State<MyOrdersPageScreen> {
       debugPrint('MyOrdersPageScreen: Cache for $cachedOrdersKey needs refresh: $needsRefresh');
 
       if (needsRefresh || _orders.isEmpty) {
-        debugPrint('MyOrdersPageScreen: Fetching fresh orders from API...');
-        await _fetchOrders(userId: _userId!, page: 1, perPage: _perPage, append: false);
+        debugPrint('MyOrdersPageScreen: Fetching fresh orders from API (no pagination)...');
+        await _fetchOrders(userId: _userId!);
       } else {
         debugPrint('MyOrdersPageScreen: Using cached data for orders. No API fetch needed on initial load.');
       }
@@ -149,34 +132,11 @@ class _MyOrdersPageScreenState extends State<MyOrdersPageScreen> {
     }
   }
 
-  // New method to load more orders for pagination
-  Future<void> _loadMoreOrders() async {
-    if (_isFetchingMore || !_hasMoreOrders || _userId == null) {
-      debugPrint("MyOrdersPageScreen: Skipping loadMoreOrders. isFetchingMore: $_isFetchingMore, hasMoreOrders: $_hasMoreOrders, userId: $_userId");
-      return;
-    }
-
-    if (mounted) {
-      setState(() {
-        _isFetchingMore = true;
-      });
-    }
-    _currentPage++;
-    debugPrint('MyOrdersPageScreen: Loading more orders. Page: $_currentPage');
-    await _fetchOrders(userId: _userId!, page: _currentPage, perPage: _perPage, append: true);
-
-    if (mounted) {
-      setState(() {
-        _isFetchingMore = false;
-      });
-    }
-  }
-
-  Future<void> _fetchOrders({required String userId, required int page, required int perPage, required bool append}) async {
+  Future<void> _fetchOrders({required String userId}) async {
     if (!await isUserAuthenticated()) return;
 
     List<Map<String, dynamic>> currentFetchedOrders = [];
-    debugPrint('MyOrdersPageScreen: _fetchOrders started for page $page, append: $append');
+    debugPrint('MyOrdersPageScreen: _fetchOrders started for userId: $userId');
     try {
       final headers = <String, String>{};
       if (_authToken != null) {
@@ -185,7 +145,7 @@ class _MyOrdersPageScreenState extends State<MyOrdersPageScreen> {
       headers['X-API-Key'] = apiKey;
 
       debugPrint('Fetching orders for userId: $userId');
-      final url = Uri.parse('$ordersEndpoint?author=$_userId');
+      final url = Uri.parse('$ordersEndpoint?author=$_userId'); // No pagination params
       debugPrint('MyOrdersPageScreen: Fetching orders from URL: $url');
       debugPrint('MyOrdersPageScreen: Fetching orders with headers: $headers');
 
@@ -229,30 +189,19 @@ class _MyOrdersPageScreenState extends State<MyOrdersPageScreen> {
 
         if (mounted) {
           setState(() {
-            if (append) {
-              _orders.addAll(currentFetchedOrders);
-            } else {
-              _orders = currentFetchedOrders;
-              _currentPage = page;
-            }
-            _hasMoreOrders = data.length == _perPage;
+            _orders = currentFetchedOrders;
             _filterOrders();
             debugPrint('MyOrdersPageScreen: Orders updated. Total _orders: ${_orders.length}, _filteredOrders: ${_filteredOrders.length}');
           });
-          if (!append) {
-             await _cacheManager.saveToCache('my_orders_$_userId', _orders);
-             debugPrint('MyOrdersPageScreen: Orders cached for user $_userId.');
-          }
+          await _cacheManager.saveToCache('my_orders_$_userId', _orders);
+          debugPrint('MyOrdersPageScreen: Orders cached for user $_userId.');
         }
       } else {
         debugPrint('MyOrdersPageScreen: Failed to load orders for user $userId: ${response.statusCode} - ${response.body}');
         if (mounted) {
           setState(() {
-            _hasMoreOrders = false;
-            if (!append) {
-              _orders.clear();
-              _filteredOrders.clear();
-            }
+            _orders.clear();
+            _filteredOrders.clear();
           });
         }
         _showErrorDialog("API Error", "Could not fetch your orders. Status: ${response.statusCode}");
@@ -261,16 +210,13 @@ class _MyOrdersPageScreenState extends State<MyOrdersPageScreen> {
       debugPrint('MyOrdersPageScreen: Caught error in _fetchOrders: $e');
       if (mounted) {
         setState(() {
-          _hasMoreOrders = false;
-          if (!append) {
-            _orders.clear();
-            _filteredOrders.clear();
-          }
+          _orders.clear();
+          _filteredOrders.clear();
         });
       }
       _showErrorDialog("Network Error", "Failed to connect to the server. Please check your internet. Error: $e");
     }
-    debugPrint('MyOrdersPageScreen: _fetchOrders finished for page $page.');
+    debugPrint('MyOrdersPageScreen: _fetchOrders finished for userId: $userId.');
   }
 
   void _filterOrders() {
@@ -305,14 +251,12 @@ class _MyOrdersPageScreenState extends State<MyOrdersPageScreen> {
     setState(() {
       _orders.clear();
       _filteredOrders.clear();
-      _currentPage = 1;
-      _hasMoreOrders = true;
       _isLoadingOrders = true;
       debugPrint('MyOrdersPageScreen: State cleared for refresh. _isLoadingOrders set to true.');
     });
 
     try {
-      await _fetchOrders(userId: _userId!, page: 1, perPage: _perPage, append: false);
+      await _fetchOrders(userId: _userId!);
     } catch (e) {
       debugPrint('MyOrdersPageScreen: Error during _onRefresh fetch: $e');
       _showErrorDialog("Refresh Error", "Failed to refresh orders. Please try again. Error: $e");
@@ -424,13 +368,17 @@ class _MyOrdersPageScreenState extends State<MyOrdersPageScreen> {
                       ? ListView.separated(
                           itemCount: 5,
                           separatorBuilder: (_, __) => const SizedBox(height: 12),
-                          itemBuilder: (context, index) => Container(
-                            margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                            height: 180,
-                            width: double.infinity,
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(12),
-                              color: Colors.grey[300],
+                          itemBuilder: (context, index) => Shimmer.fromColors(
+                            baseColor: Colors.grey[300]!,
+                            highlightColor: Colors.grey[100]!,
+                            child: Container(
+                              margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                              height: 180,
+                              width: double.infinity,
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(12),
+                                color: Colors.grey[300],
+                              ),
                             ),
                           ),
                         )
@@ -441,24 +389,13 @@ class _MyOrdersPageScreenState extends State<MyOrdersPageScreen> {
                                   : const Text("Keine Aufträge gefunden, die Ihren Kriterien entsprechen."),
                             )
                           : ListView.builder(
-                              controller: _scrollController,
                               physics: const AlwaysScrollableScrollPhysics(),
-                              itemCount: _filteredOrders.length + (_hasMoreOrders ? 1 : 0),
+                              itemCount: _filteredOrders.length,
                               itemBuilder: (context, index) {
-                                if (index == _filteredOrders.length) {
-                                  return _isFetchingMore
-                                      ? const CustomLoadingIndicator(
-                                          size: 30.0,
-                                          message: 'Mehr wird geladen...',
-                                        )
-                                      : const SizedBox.shrink();
-                                }
-
                                 final order = _filteredOrders[index];
                                 final imageUrl = order['displayImageUrl'] ?? '';
                                 final fallbackImageUrl = order['fallbackImageUrl'] ?? '';
                                 final title = order['title']['rendered'] ?? 'Untitled';
-                                //final categoryName = order['acf']?['category'] ?? 'N/A';
 
                                 return GestureDetector(
                                   onTap: () async {
