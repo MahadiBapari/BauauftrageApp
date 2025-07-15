@@ -148,7 +148,7 @@ class _AllOrdersPageScreenState extends State<AllOrdersPageScreen> {
 
             // 2. Ensure 'All Categories' is present and at the top
             processedCategories.removeWhere((cat) => cat['id'] == null);
-            processedCategories.insert(0, {'id': null, 'name': 'All Categories'});
+            processedCategories.insert(0, {'id': null, 'name': 'Alle Kategorien'});
             
             _categories = processedCategories;
             _isLoadingCategories = false;
@@ -318,7 +318,7 @@ class _AllOrdersPageScreenState extends State<AllOrdersPageScreen> {
     if (!await isUserAuthenticated()) return;
 
     List<Map<String, dynamic>> fetchedCategories = [
-      {'id': null, 'name': 'All Categories'} // Add an "All Categories" option
+      {'id': null, 'name': 'Alle Kategorien'} // Add an "All Categories" option
     ];
     debugPrint('AllOrdersPageScreen: Fetching categories...');
     try {

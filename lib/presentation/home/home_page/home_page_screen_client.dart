@@ -778,7 +778,7 @@ class _HomePageScreenClientState extends State<HomePageScreenClient> with Automa
               const SizedBox(height: 8),
               Text(
                 category.name,
-                style: const TextStyle(fontWeight: FontWeight.w500),
+                style: const TextStyle(fontWeight: FontWeight.w500, color: Colors.black, fontSize: 12),
                 textAlign: TextAlign.center,
               ),
             ],

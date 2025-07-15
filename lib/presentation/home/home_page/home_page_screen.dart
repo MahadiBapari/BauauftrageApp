@@ -118,7 +118,7 @@ class _HomePageScreenState extends State<HomePageScreen> {
 
         // Ensure 'All Categories' is present and at the top.
         processedCategories.removeWhere((cat) => cat['id'] == null);
-        processedCategories.insert(0, {'id': null, 'name': 'All Categories'});
+        processedCategories.insert(0, {'id': null, 'name': 'Alle Kategorien'});
         
         setState(() {
           _categories = processedCategories;
@@ -370,7 +370,7 @@ class _HomePageScreenState extends State<HomePageScreen> {
         if (mounted) {
           
           var uiCategories = List<Map<String, dynamic>>.from(rawCategories);
-          uiCategories.insert(0, {'id': null, 'name': 'All Categories'});
+          uiCategories.insert(0, {'id': null, 'name': 'Alle Kategorien'});
           
           setState(() {
             _categories = uiCategories;
