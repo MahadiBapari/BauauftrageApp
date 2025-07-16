@@ -323,12 +323,38 @@ class _SingleMyOrderPageScreenState extends State<SingleMyOrderPageScreen> {
           await showDialog(
             context: context,
             builder: (ctx) => AlertDialog(
-              title: const Text('Erfolg'),
-              content: const Text('D Bshtellig isch erfolgriich glöscht worde.'),
+              backgroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              title: Row(
+                children: const [
+                  //Icon(Icons.check_circle, color: Colors.green, size: 28),
+                  SizedBox(width: 8),
+                  Text(
+                    'Erfolg',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                  ),
+                ],
+              ),
+              content: const Text(
+                'D Bshtellig isch erfolgriich glöscht worde.',
+                style: TextStyle(fontSize: 16),
+              ),
               actions: [
-                TextButton(
+                ElevatedButton(
                   onPressed: () => Navigator.of(ctx).pop(),
-                  child: const Text('Guet'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Color.fromARGB(255, 179, 21, 21),
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  child: const Text(
+                    'Schließen',
+                    style: TextStyle(fontSize: 16),
+                  ),
                 ),
               ],
             ),

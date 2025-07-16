@@ -1359,7 +1359,7 @@ class _HomePageScreenState extends State<HomePageScreen> {
             context: context,
             builder: (context) => MembershipRequiredDialog(
               context: context,
-              message: 'Mitgliedschaft erforderlich, um Auftragsdetails zu sehen. Erwerben Sie eine Mitgliedschaft, um alle Auftragsinformationen zu erhalten.',
+              message: 'Eine Mitgliedschaft ist erforderlich, um Aufträge einzusehen. Werde Mitglied, um Zugriff auf alle Aufträge zu erhalten.',
             ),
           );
         }

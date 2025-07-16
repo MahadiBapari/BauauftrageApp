@@ -68,4 +68,53 @@ class MembershipRequiredDialog extends StatelessWidget {
       ],
     );
   }
+}
+
+class DankeDialog extends StatelessWidget {
+  final String message;
+
+  const DankeDialog({
+    super.key,
+    this.message = 'Danke für Ihren Auftrag!\nBald möglichst wird sich einer unserer Handwerker bei Ihnen melden.\n\nIhr Bauaufträge24.ch‑Team.',
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      backgroundColor: Colors.white,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+      ),
+      title: Row(
+        children: const [
+          Icon(Icons.check_circle, color: Colors.green, size: 28),
+          SizedBox(width: 8),
+          Text(
+            'Auftrag übermittelt',
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+          ),
+        ],
+      ),
+      content: Text(
+        message,
+        style: const TextStyle(fontSize: 16),
+      ),
+      actions: [
+        ElevatedButton(
+          onPressed: () => Navigator.pop(context),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color.fromARGB(255, 179, 21, 21),
+            foregroundColor: Colors.white,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+          ),
+          child: const Text(
+            'Schließen',
+            style: TextStyle(fontSize: 16),
+          ),
+        ),
+      ],
+    );
+  }
 } 

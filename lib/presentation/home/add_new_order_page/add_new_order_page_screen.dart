@@ -215,17 +215,45 @@ final Map<String, dynamic> postData = {
     );
 
       if (response.statusCode == 201) {
-        if (!mounted) return; // Check if the widget is still mounted before interacting with the UI
+        if (!mounted) return;
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text('Auftrag erfolgreich übermittelt und veröffentlicht!'),
-            backgroundColor: const Color.fromARGB(129, 0, 0, 0),
-            behavior: SnackBarBehavior.floating,
+        await showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            backgroundColor: Colors.white,
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(10),
+              borderRadius: BorderRadius.circular(16),
             ),
-            margin: const EdgeInsets.all(10),
+            title: Row(
+              children: const [
+                Icon(Icons.check_circle, color: Colors.green, size: 28),
+                SizedBox(width: 8),
+                Text(
+                  'Auftrag übermittelt',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                ),
+              ],
+            ),
+            content: const Text(
+              'Danke für Ihren Auftrag!\nBald möglichst wird sich einer unserer Handwerker bei Ihnen melden.\n\nIhr Bauaufträge24.ch‑Team.',
+              style: TextStyle(fontSize: 16),
+            ),
+            actions: [
+              ElevatedButton(
+                onPressed: () => Navigator.pop(context),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Color.fromARGB(255, 179, 21, 21),
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                child: const Text(
+                  'Schließen',
+                  style: TextStyle(fontSize: 16),
+                ),
+              ),
+            ],
           ),
         );
 
