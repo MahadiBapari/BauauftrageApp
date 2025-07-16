@@ -72,9 +72,9 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
         children: [
           Image.asset('assets/images/success.png', height: 80),
           const SizedBox(height: 24),
-          const Text("Dini E-Mail isch erfolgrich bestätigt worde!", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.green)),
+          const Text("Deine  E -Mail wurde Erfolgreich bestätigt!", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.green)),
           const SizedBox(height: 12),
-          const Text("Du wirsch gli zum Login witergleitet.", textAlign: TextAlign.center),
+          const Text("Du wirst gleich weitergeleitet.", textAlign: TextAlign.center),
         ],
       );
     } else if (status == "Invalid verification link.") {

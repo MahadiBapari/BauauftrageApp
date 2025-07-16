@@ -670,7 +670,7 @@ class _HomePageScreenClientState extends State<HomePageScreenClient> with Automa
                                   const SizedBox(height: 16),
                                   ElevatedButton.icon(
                                     icon: const Icon(Icons.add),
-                                    label: const Text('Auftrag erfasse'),
+                                    label: const Text('Auftrag erfassen'),
                                     style: ElevatedButton.styleFrom(
                                       backgroundColor: Color.fromARGB(255, 179, 21, 21),
                                       foregroundColor: Colors.white,

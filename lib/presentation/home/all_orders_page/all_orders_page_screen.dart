@@ -709,7 +709,7 @@ class _AllOrdersPageScreenState extends State<AllOrdersPageScreen> {
                                         context: context,
                                         builder: (context) => MembershipRequiredDialog(
                                           context: context,
-                                          message: 'A membership is required to view order details. Get a membership to access all order information.',
+                                          message: 'Eine Mitgliedschaft ist erforderlich, um Aufträge einzusehen. Werde Mitglied, um Zugriff auf alle Aufträge zu erhalten.',
                                         ),
                                       );
                                     }

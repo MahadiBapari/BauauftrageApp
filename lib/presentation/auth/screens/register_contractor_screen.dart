@@ -386,7 +386,7 @@ Die Nutzung der Plattform kann, insbesondere aus technischen Gründen, zeitweili
                 DropdownButtonFormField<String>(
                   value: _selectedCategory,
                   decoration: InputDecoration(
-                    labelText: 'Verfügbari Zyt',
+                    labelText: 'Verfügbare Zeit',
                     filled: true,
                     fillColor: Colors.grey[100],
                     border: OutlineInputBorder(
@@ -500,7 +500,7 @@ Die Nutzung der Plattform kann, insbesondere aus technischen Gründen, zeitweili
                       buttonIcon: const Icon(Icons.category, color: Color.fromARGB(255, 185, 33, 33)),
                       buttonText: Text(
                         _selectedServiceCategories.isEmpty
-                          ? "Service Kategorie ussuewähle*"
+                          ? "Kategorie auswählen*"
                           : "${_selectedServiceCategories.length} Kategorie(n) ausgewählt",
                         style: TextStyle(fontSize: 16, color: Colors.black87),
                       ),

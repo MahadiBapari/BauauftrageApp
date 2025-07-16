@@ -568,15 +568,15 @@ class _ProfilePageState extends State<ProfilePageScreenContractor> {
                           ),
                           _buildInfoRow(
                             context,
-                            'Dienstleistigskategorie',
+                            'Kategorie',
                             _getCategoryNames(),
                             Icons.category,
                           ),
                           _buildInfoRow(
                             context,
-                            'Verfügbari Zyt',
+                            'Verfügbare Zeit',
                             _userData!['meta_data']?['available_time']?[0] ??
-                                'Kei verfügbari Zyt',
+                                'Kei Verfügbare Zeit',
                             Icons.access_time,
                           ),
                           const SizedBox(height: 30),

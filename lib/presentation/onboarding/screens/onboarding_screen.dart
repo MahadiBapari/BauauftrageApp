@@ -260,7 +260,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     ),
                   ] else if (_currentIndex != onboardingPages.length - 1) ...[
                     OnboardingButton(
-                        text: 'Wiiter',
+                        text: 'Weiter',
                       onPressed: _nextPage,
                     ),
                     OnboardingSkipButton(onPressed: _skip),

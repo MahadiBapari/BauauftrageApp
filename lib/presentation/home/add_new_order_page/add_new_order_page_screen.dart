@@ -447,7 +447,7 @@ Widget build(BuildContext context) {
             Expanded(
               child: Text(
                 _selectedImages.isEmpty
-                    ? 'Keine Bilder ausgewählt?'
+                    ? ''
                     : '${_selectedImages.length} Bild(er) usgwählt',
                 overflow: TextOverflow.ellipsis,
               ),

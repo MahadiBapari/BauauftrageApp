@@ -947,7 +947,7 @@ class _HomePageScreenState extends State<HomePageScreen> {
           const SizedBox(height: 16),
           Center(
             child: Text(
-                'Du bisch aktuell kei Mitglied. Jetzt Mitglied werde für meh Vorteili!',
+                'Schalten Sie jetzt Ihr Abonnement frei, um alle Aufträge einsehen zu können.',
               textAlign: TextAlign.center,
               style: TextStyle(
                 color: Colors.white.withOpacity(0.8),
@@ -977,7 +977,7 @@ class _HomePageScreenState extends State<HomePageScreen> {
                 elevation: 5,
               ),
               child: Text(
-                'Jetzt Mitglied werde',
+                'Jetzt Mitglied werden',
                 style: TextStyle(
                   fontSize: buttonFontSize,
                   fontWeight: FontWeight.bold,
@@ -1199,7 +1199,7 @@ class _HomePageScreenState extends State<HomePageScreen> {
         _isLoadingPartners
             ? const CustomLoadingIndicator(
                 size: 30.0,
-                message: 'Loading partners...',
+                message: 'Partners...',
                 isHorizontal: true,
                 itemCount: 4,
                 itemHeight: 240,
