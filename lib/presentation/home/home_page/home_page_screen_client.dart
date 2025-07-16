@@ -11,6 +11,7 @@ import 'package:bauauftrage/core/network/safe_http.dart';
 import '../add_new_order_page/add_new_order_page_screen.dart';
 import 'package:bauauftrage/common/utils/auth_utils.dart';
 import '../partners_page/partners_page_screen.dart';
+import '../my_order_page/my_order_page_screen.dart';
 
 class HomePageScreenClient extends StatefulWidget {
   final void Function(String categoryId)? onCategorySelected;
@@ -176,10 +177,15 @@ class _HomePageScreenClientState extends State<HomePageScreenClient> with Automa
   Future<void> _onRefresh() async {
     setState(() {
       _isLoadingOrders = true;
+      _isLoadingCategories = true;
     });
-    await _loadOrders(forceRefresh: true);
+    await Future.wait([
+      _loadOrders(forceRefresh: true),
+      _loadCategories(forceRefresh: true),
+    ]);
     setState(() {
       _isLoadingOrders = false;
+      _isLoadingCategories = false;
     });
   }
 
@@ -502,7 +508,7 @@ class _HomePageScreenClientState extends State<HomePageScreenClient> with Automa
                   const SizedBox(height: 6),
                   _isLoadingCategories && _categories.isEmpty
                       ? SizedBox(
-                          height: 120,
+                          height: 130,
                           child: ListView.separated(
                             scrollDirection: Axis.horizontal,
                             itemCount: 5,
@@ -531,7 +537,10 @@ class _HomePageScreenClientState extends State<HomePageScreenClient> with Automa
                                 separatorBuilder: (context, index) => const SizedBox(width: 10),
                                 itemBuilder: (context, index) {
                                   final category = _categories[index];
-                                  return _buildCategoryCard(category);
+                                  return Padding(
+                                    padding: const EdgeInsets.only(bottom: 8),
+                                    child: _buildCategoryCard(category),
+                                  );
                                 },
                               ),
                             ),
@@ -604,12 +613,34 @@ class _HomePageScreenClientState extends State<HomePageScreenClient> with Automa
                   const SizedBox(height: 24),
 
                   // My Orders Section
-                  const Text(
-                    'Meine Aufträge',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.w500,
-                    ),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        'Meine Aufträge',
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      TextButton(
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => MyOrdersPageScreen(),
+                            ),
+                          );
+                        },
+                        child: const Text(
+                          'Alle Aufträge',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Color.fromARGB(255, 179, 21, 21),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 6),
                   _isLoadingOrders && _orders.isEmpty
@@ -661,7 +692,7 @@ class _HomePageScreenClientState extends State<HomePageScreenClient> with Automa
                           : ListView.separated(
                               shrinkWrap: true,
                               physics: const NeverScrollableScrollPhysics(),
-                              itemCount: _orders.length,
+                              itemCount: _orders.length > 5 ? 5 : _orders.length,
                               separatorBuilder: (context, index) => const SizedBox(height: 12),
                               itemBuilder: (context, index) {
                                 final order = _orders[index];
@@ -678,6 +709,7 @@ class _HomePageScreenClientState extends State<HomePageScreenClient> with Automa
   }
 
   Widget _buildCategoryCard(Category category) {
+
     final cdnUrl = category.catImageCdn?['cdn_url'] as String?;
     final originalUrl = category.catImageCdn?['original_url'] as String?;
     return InkWell(
@@ -694,7 +726,7 @@ class _HomePageScreenClientState extends State<HomePageScreenClient> with Automa
             borderRadius: BorderRadius.circular(12),
             boxShadow: [
               BoxShadow(
-                color: const Color.fromARGB(255, 59, 59, 59).withOpacity(0.15),
+                color: const Color.fromARGB(255, 110, 110, 110).withOpacity(0.15),
                 blurRadius: 8,
                 spreadRadius: 2,
                 offset: const Offset(0, 4),
@@ -790,7 +822,7 @@ class _HomePageScreenClientState extends State<HomePageScreenClient> with Automa
 
   Widget _buildPartnerCard(Partner partner) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
+      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 2),
       child: InkWell(
         onTap: () {
           // TODO: Navigate to partner details
@@ -803,7 +835,7 @@ class _HomePageScreenClientState extends State<HomePageScreenClient> with Automa
             borderRadius: BorderRadius.circular(16),
             boxShadow: [
               BoxShadow(
-                color: const Color.fromARGB(255, 59, 59, 59).withOpacity(0.15),
+                color: const Color.fromARGB(255, 99, 99, 99).withOpacity(0.15),
                 blurRadius: 8,
                 spreadRadius: 2,
                 offset: const Offset(0, 4),
@@ -878,9 +910,18 @@ class _HomePageScreenClientState extends State<HomePageScreenClient> with Automa
   Widget _buildOrderCard(Order order) {
     return InkWell(
       onTap: () async {
-        debugPrint('Order card tapped. fullOrder: \\${order.fullOrder}');
+        FocusScope.of(context).unfocus();
         if (order.fullOrder != null) {
-          debugPrint('Order fullOrder is null, not navigating.');
+          final bool? result = await Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => SingleMyOrderPageScreen(order: order.fullOrder!),
+            ),
+          );
+          if (result == true) {
+            debugPrint('HomePageScreenClient: SingleMyOrderPageScreen returned true. Triggering _onRefresh().');
+            _onRefresh();
+          }
         }
       },
       child: Container(

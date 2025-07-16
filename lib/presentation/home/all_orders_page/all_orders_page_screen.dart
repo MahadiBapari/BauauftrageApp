@@ -45,7 +45,7 @@ class _AllOrdersPageScreenState extends State<AllOrdersPageScreen> {
   final ScrollController _scrollController = ScrollController();
 
   // API constants
-  final String ordersEndpoint = 'https://xn--bauauftrge24-ncb.ch/wp-json/wp/v2/client-order?per_page=100';
+  final String ordersEndpoint = 'https://xn--bauauftrge24-ncb.ch/wp-json/wp/v2/client-order';
   final String categoriesEndpoint = 'https://xn--bauauftrge24-ncb.ch/wp-json/wp/v2/order-categories?per_page=100';
   final String mediaEndpointBase = 'https://xn--bauauftrge24-ncb.ch/wp-json/wp/v2/media/';
   final String apiKey = '1234567890abcdef'; // Assuming API key needed for user data
@@ -176,6 +176,13 @@ class _AllOrdersPageScreenState extends State<AllOrdersPageScreen> {
       
       await Future.wait(fetchFutures); // Await only the necessary fetches
 
+      // After initial load, if _hasMoreOrders is true and the list is not scrollable, trigger _loadMoreOrders()
+      await Future.delayed(const Duration(milliseconds: 100)); // Let the UI build
+      if (_hasMoreOrders && _orders.length < _perPage) {
+        // Try to load more if the list is not scrollable (e.g., only a few orders per page)
+        _loadMoreOrders();
+      }
+
     } catch (e) {
       debugPrint('Error loading all data: $e');
       // Potentially show a global error dialog if initial load fails completely
@@ -212,6 +219,7 @@ class _AllOrdersPageScreenState extends State<AllOrdersPageScreen> {
   }
 
   Future<void> _fetchOrders({required int page, required int perPage, required bool append}) async {
+    debugPrint('Fetching page $page, perPage $perPage');
     if (!await isUserAuthenticated()) return;
 
     if (!append) {
@@ -268,13 +276,19 @@ class _AllOrdersPageScreenState extends State<AllOrdersPageScreen> {
         if (mounted) {
           setState(() {
             if (append) {
-              _orders.addAll(currentFetchedOrders); // Append for pagination
+              // Prevent duplicates by ID
+              final existingIds = _orders.map((o) => o['id']).toSet();
+              final newOrders = currentFetchedOrders.where((o) => !existingIds.contains(o['id'])).toList();
+              _orders.addAll(newOrders); // Append only unique orders
+              debugPrint('Appended ${newOrders.length} new orders');
             } else {
               _orders = currentFetchedOrders; // Overwrite for initial load/refresh
               _currentPage = 1; // Reset current page for fresh fetch
               _cacheManager.saveToCache('all_orders', currentFetchedOrders); // Save to cache
               debugPrint('AllOrdersPageScreen: Orders cached.');
+              debugPrint('Appended ${currentFetchedOrders.length} new orders');
             }
+            debugPrint('Total loaded: ${_orders.length}');
             _hasMoreOrders = data.length == _perPage; // Check if more pages exist
             _filterOrders(); // <--- Call filterOrders after _orders is updated
           });
