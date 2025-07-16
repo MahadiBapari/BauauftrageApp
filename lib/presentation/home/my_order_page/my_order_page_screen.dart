@@ -45,7 +45,14 @@ class _MyOrdersPageScreenState extends State<MyOrdersPageScreen> {
   @override
   void initState() {
     super.initState();
-    _loadOrdersFromCacheThenBackground();
+    _loadAllData();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Always refresh orders when the page is shown
+    _loadAllData();
   }
 
   @override
@@ -53,7 +60,7 @@ class _MyOrdersPageScreenState extends State<MyOrdersPageScreen> {
     super.dispose();
   }
 
-  Future<void> _loadOrdersFromCacheThenBackground() async {
+  Future<void> _loadAllData() async {
     final prefs = await SharedPreferences.getInstance();
     _userId = prefs.getString('user_id');
     _authToken = prefs.getString('auth_token');
@@ -64,69 +71,20 @@ class _MyOrdersPageScreenState extends State<MyOrdersPageScreen> {
       _showErrorDialog("User Not Logged In", "Please log in to view your orders.");
       return;
     }
-    // Try to load from cache first
-    final cachedOrdersKey = 'my_orders_$_userId';
-    final cachedData = await _cacheManager.loadFromCache(cachedOrdersKey);
-    if (cachedData != null) {
-      setState(() {
-        _orders = List<Map<String, dynamic>>.from(cachedData as List);
-        _filterOrders();
-        _isLoadingOrders = false;
-      });
-    }
-    // Fetch fresh data in background
-    _loadAllData();
-  }
-
-  // Loads all orders at once (no pagination)
-  Future<void> _loadAllData() async {
-    if (_userId == null) {
-      debugPrint("MyOrdersPageScreen: _loadAllData called with null userId. Aborting fetch.");
-      if (mounted) {
-        setState(() {
-          _isLoadingOrders = false;
-        });
-      }
-      return;
-    }
-
     if (mounted) {
       setState(() {
-        _isLoadingOrders = true; // Ensure loading is true at the start
+        _isLoadingOrders = true;
       });
     }
-
     try {
-      final cachedOrdersKey = 'my_orders_$_userId'; 
-      final cachedData = await _cacheManager.loadFromCache(cachedOrdersKey);
-      debugPrint('MyOrdersPageScreen: Loaded cached data for $cachedOrdersKey: ${cachedData != null}');
-
-      if (mounted) {
-        setState(() {
-          if (cachedData != null) {
-            _orders = List<Map<String, dynamic>>.from(cachedData as List);
-            _filterOrders();
-            // Do NOT set _isLoadingOrders to false here. Let the final block handle it.
-          }
-        });
-      }
-
-      final needsRefresh = await _cacheManager.isCacheExpired(cachedOrdersKey);
-      debugPrint('MyOrdersPageScreen: Cache for $cachedOrdersKey needs refresh: $needsRefresh');
-
-      if (needsRefresh || _orders.isEmpty) {
-        debugPrint('MyOrdersPageScreen: Fetching fresh orders from API (no pagination)...');
-        await _fetchOrders(userId: _userId!);
-      } else {
-        debugPrint('MyOrdersPageScreen: Using cached data for orders. No API fetch needed on initial load.');
-      }
+      await _fetchOrders(userId: _userId!);
     } catch (e) {
       debugPrint('MyOrdersPageScreen: Error in _loadAllData for user $_userId: $e');
       _showErrorDialog("Loading Error", "Could not load data. Please check your internet connection.");
     } finally {
       if (mounted) {
         setState(() {
-          _isLoadingOrders = false; // Ensure loading state is false after all attempts
+          _isLoadingOrders = false;
         });
       }
     }
