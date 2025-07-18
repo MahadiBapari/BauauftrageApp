@@ -23,6 +23,13 @@ class _MyOrdersPageScreenState extends State<MyOrdersPageScreen> {
   // Loading states
   bool _isLoadingOrders = true;
 
+  // Pagination states
+  int _currentPage = 1;
+  final int _perPage = 10;
+  bool _hasMoreOrders = true;
+  bool _isFetchingMore = false;
+  final ScrollController _scrollController = ScrollController();
+
   // Data lists
   List<Map<String, dynamic>> _orders = []; // Stores raw fetched orders with image URLs
   List<Map<String, dynamic>> _filteredOrders = []; // Stores orders after search filter
@@ -46,6 +53,7 @@ class _MyOrdersPageScreenState extends State<MyOrdersPageScreen> {
   @override
   void initState() {
     super.initState();
+    _scrollController.addListener(_scrollListener);
     _loadAllData();
   }
 
@@ -58,7 +66,31 @@ class _MyOrdersPageScreenState extends State<MyOrdersPageScreen> {
 
   @override
   void dispose() {
+    _scrollController.removeListener(_scrollListener);
+    _scrollController.dispose();
     super.dispose();
+  }
+
+  void _scrollListener() {
+    if (_scrollController.position.pixels >= _scrollController.position.maxScrollExtent - 100 && !_isFetchingMore && _hasMoreOrders) {
+      _loadMoreOrders();
+    }
+  }
+
+  Future<void> _loadMoreOrders() async {
+    if (_isFetchingMore || !_hasMoreOrders) return;
+    setState(() {
+      _isFetchingMore = true;
+    });
+    final nextPage = _currentPage + 1;
+    final prevOrderCount = _orders.length;
+    await _fetchOrders(userId: _userId!, page: nextPage, perPage: _perPage, append: true);
+    if (_orders.length > prevOrderCount) {
+      _currentPage = nextPage;
+    }
+    setState(() {
+      _isFetchingMore = false;
+    });
   }
 
   Future<void> _loadAllData() async {
@@ -78,7 +110,7 @@ class _MyOrdersPageScreenState extends State<MyOrdersPageScreen> {
       });
     }
     try {
-      await _fetchOrders(userId: _userId!);
+      await _fetchOrders(userId: _userId!, page: 1, perPage: 10, append: false);
     } catch (e) {
       debugPrint('MyOrdersPageScreen: Error in _loadAllData for user $_userId: $e');
       _showErrorDialog("Loading Error", "Could not load data. Please check your internet connection.");
@@ -91,43 +123,30 @@ class _MyOrdersPageScreenState extends State<MyOrdersPageScreen> {
     }
   }
 
-  Future<void> _fetchOrders({required String userId}) async {
+  Future<void> _fetchOrders({required String userId, required int page, required int perPage, required bool append}) async {
     if (!await isUserAuthenticated()) return;
-
+    if (!append) {
+      if (mounted) {
+        setState(() {
+          _isLoadingOrders = true;
+          _filteredOrders.clear();
+        });
+      }
+    }
     List<Map<String, dynamic>> currentFetchedOrders = [];
-    debugPrint('MyOrdersPageScreen: _fetchOrders started for userId: $userId');
     try {
       final headers = <String, String>{};
       if (_authToken != null) {
         headers['Authorization'] = 'Bearer $_authToken';
       }
       headers['X-API-Key'] = apiKey;
-
-      debugPrint('Fetching orders for userId: $userId');
-      final url = Uri.parse('$ordersEndpoint?author=$_userId'); // No pagination params
-      debugPrint('MyOrdersPageScreen: Fetching orders from URL: $url');
-      debugPrint('MyOrdersPageScreen: Fetching orders with headers: $headers');
-
-      final response = await SafeHttp.safeGet(context, url, headers: headers);
-
-      if (!mounted) {
-        debugPrint('MyOrdersPageScreen: _fetchOrders: Widget unmounted during API call.');
-        return;
-      }
-
-      debugPrint('MyOrdersPageScreen: Orders API response status: ${response.statusCode}');
-      if (response.statusCode == 200 || response.statusCode == 401 || response.statusCode == 403) {
-        debugPrint('MyOrdersPageScreen: Orders API response body: ${response.body.substring(0, response.body.length > 500 ? 500 : response.body.length)}...');
-      } else {
-        debugPrint('MyOrdersPageScreen: Orders API response body (full, for unexpected status): ${response.body}');
-      }
-
+      // Use author, per_page, and page for dynamic pagination
+      String url = '$ordersEndpoint?author=$userId&page=$page&per_page=$perPage';
+      final response = await SafeHttp.safeGet(context, Uri.parse(url), headers: headers);
+      if (!mounted) return;
       if (response.statusCode == 200) {
         final List<dynamic> data = jsonDecode(response.body);
-        debugPrint('MyOrdersPageScreen: Raw data length: [32m${data.length}[0m');
         for (var order in data) {
-          debugPrint('Fetched order with id: \u001b[36m[0m, author: \u001b[33m[0m');
-          // --- BEGIN CDN IMAGE LOGIC ---
           String cdnUrl = '';
           String originalUrl = '';
           if (order['order_gallery_cdn'] != null &&
@@ -142,40 +161,50 @@ class _MyOrdersPageScreenState extends State<MyOrdersPageScreen> {
           }
           order['displayImageUrl'] = cdnUrl;
           order['fallbackImageUrl'] = originalUrl;
-          // --- END CDN IMAGE LOGIC ---
           currentFetchedOrders.add(order);
         }
-
         if (mounted) {
           setState(() {
-            _orders = currentFetchedOrders;
+            if (append) {
+              final existingIds = _orders.map((o) => o['id']).toSet();
+              final newOrders = currentFetchedOrders.where((o) => !existingIds.contains(o['id'])).toList();
+              _orders.addAll(newOrders);
+            } else {
+              _orders = currentFetchedOrders;
+              _currentPage = 1;
+            }
+            _hasMoreOrders = data.length == _perPage;
             _filterOrders();
-            debugPrint('MyOrdersPageScreen: Orders updated. Total _orders: ${_orders.length}, _filteredOrders: ${_filteredOrders.length}');
           });
-          await _cacheManager.saveToCache('my_orders_$_userId', _orders);
-          debugPrint('MyOrdersPageScreen: Orders cached for user $_userId.');
         }
       } else {
-        debugPrint('MyOrdersPageScreen: Failed to load orders for user $userId: ${response.statusCode} - ${response.body}');
         if (mounted) {
           setState(() {
-            _orders.clear();
-            _filteredOrders.clear();
+            _hasMoreOrders = false;
+            if (!append) {
+              _orders.clear();
+              _filteredOrders.clear();
+            }
           });
         }
-        _showErrorDialog("API Error", "Could not fetch your orders. Status: ${response.statusCode}");
       }
     } catch (e) {
-      debugPrint('MyOrdersPageScreen: Caught error in _fetchOrders: $e');
       if (mounted) {
         setState(() {
-          _orders.clear();
-          _filteredOrders.clear();
+          _hasMoreOrders = false;
+          if (!append) {
+            _orders.clear();
+            _filteredOrders.clear();
+          }
         });
       }
-      _showErrorDialog("Network Error", "Failed to connect to the server. Please check your internet. Error: $e");
+    } finally {
+      if (mounted && !append) {
+        setState(() {
+          _isLoadingOrders = false;
+        });
+      }
     }
-    debugPrint('MyOrdersPageScreen: _fetchOrders finished for userId: $userId.');
   }
 
   void _filterOrders() {
@@ -215,7 +244,7 @@ class _MyOrdersPageScreenState extends State<MyOrdersPageScreen> {
     });
 
     try {
-      await _fetchOrders(userId: _userId!);
+      await _fetchOrders(userId: _userId!, page: 1, perPage: 10, append: false);
     } catch (e) {
       debugPrint('MyOrdersPageScreen: Error during _onRefresh fetch: $e');
       _showErrorDialog("Refresh Error", "Failed to refresh orders. Please try again. Error: $e");
@@ -361,100 +390,121 @@ class _MyOrdersPageScreenState extends State<MyOrdersPageScreen> {
                                   : const Text("Keine Aufträge gefunden, die Ihren Kriterien entsprechen."),
                             )
                           : ListView.builder(
+                              controller: _scrollController,
                               physics: const AlwaysScrollableScrollPhysics(),
-                              itemCount: _filteredOrders.length,
+                              itemCount: _filteredOrders.length + (_hasMoreOrders ? 1 : 0),
                               itemBuilder: (context, index) {
-                                final order = _filteredOrders[index];
-                                final imageUrl = order['displayImageUrl'] ?? '';
-                                final fallbackImageUrl = order['fallbackImageUrl'] ?? '';
-                                final title = order['title']['rendered'] ?? 'Untitled';
+                                if (index < _filteredOrders.length) {
+                                  final order = _filteredOrders[index];
+                                  final imageUrl = order['displayImageUrl'] ?? '';
+                                  final fallbackImageUrl = order['fallbackImageUrl'] ?? '';
+                                  final title = order['title']['rendered'] ?? 'Untitled';
 
-                                return GestureDetector(
-                                  onTap: () async {
-                                    FocusScope.of(context).unfocus();
-                                    final bool? result = await Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (_) => SingleMyOrderPageScreen(order: order),
+                                  return GestureDetector(
+                                    onTap: () async {
+                                      FocusScope.of(context).unfocus();
+                                      final bool? result = await Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (_) => SingleMyOrderPageScreen(order: order),
+                                        ),
+                                      );
+
+                                      if (result == true) {
+                                        debugPrint('MyOrdersPageScreen: SingleMyOrderPageScreen returned true. Triggering _onRefresh().');
+                                        _onRefresh();
+                                      }
+                                    },
+                                    child: Container(
+                                      margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                                      height: 180,
+                                      width: double.infinity,
+                                      decoration: BoxDecoration(
+                                        borderRadius: BorderRadius.circular(12),
+                                        color: Colors.grey[100],
                                       ),
-                                    );
-
-                                    if (result == true) {
-                                      debugPrint('MyOrdersPageScreen: SingleMyOrderPageScreen returned true. Triggering _onRefresh().');
-                                      _onRefresh();
-                                    }
-                                  },
-                                  child: Container(
-                                    margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                                    height: 180,
-                                    width: double.infinity,
-                                    decoration: BoxDecoration(
-                                      borderRadius: BorderRadius.circular(12),
-                                      color: Colors.grey[100],
-                                    ),
-                                    child: ClipRRect(
-                                      borderRadius: BorderRadius.circular(12),
-                                      child: Stack(
-                                        children: [
-                                          if (imageUrl.isNotEmpty)
+                                      child: ClipRRect(
+                                        borderRadius: BorderRadius.circular(12),
+                                        child: Stack(
+                                          children: [
+                                            if (imageUrl.isNotEmpty)
+                                              Positioned.fill(
+                                                child: Image.network(
+                                                  imageUrl,
+                                                  fit: BoxFit.cover,
+                                                  errorBuilder: (context, error, stackTrace) {
+                                                    if (fallbackImageUrl.isNotEmpty) {
+                                                      return Image.network(
+                                                        fallbackImageUrl,
+                                                        fit: BoxFit.cover,
+                                                        errorBuilder: (context, error, stackTrace) => Container(color: Colors.grey[300]),
+                                                      );
+                                                    }
+                                                    return Container(color: Colors.grey[300]);
+                                                  },
+                                                ),
+                                              ),
+                                            // Full overlay across the whole card
                                             Positioned.fill(
-                                              child: Image.network(
-                                                imageUrl,
-                                                fit: BoxFit.cover,
-                                                errorBuilder: (context, error, stackTrace) {
-                                                  // Fallback to original URL if CDN fails
-                                                  if (fallbackImageUrl.isNotEmpty) {
-                                                    return Image.network(
-                                                      fallbackImageUrl,
-                                                      fit: BoxFit.cover,
-                                                      errorBuilder: (context, error, stackTrace) => Container(color: Colors.grey[300]),
-                                                    );
-                                                  }
-                                                  return Container(color: Colors.grey[300]);
-                                                },
-                                              ),
-                                            ),
-                                          // Full overlay across the whole card
-                                          Positioned.fill(
-                                            child: Container(
-                                              decoration: BoxDecoration(
-                                                color: const Color.fromARGB(172, 0, 0, 0).withOpacity(0.4),
-                                              ),
-                                              child: Padding(
-                                                padding: const EdgeInsets.all(16),
-                                                child: Align(
-                                                  alignment: Alignment.bottomLeft,
-                                                  child: Column(
-                                                    mainAxisAlignment: MainAxisAlignment.end,
-                                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                                    children: [
-                                                      Text(
-                                                        title,
-                                                        style: const TextStyle(
-                                                          fontSize: 18,
-                                                          fontWeight: FontWeight.bold,
-                                                          color: Colors.white,
+                                              child: Container(
+                                                decoration: BoxDecoration(
+                                                  color: const Color.fromARGB(172, 0, 0, 0).withOpacity(0.4),
+                                                ),
+                                                child: Padding(
+                                                  padding: const EdgeInsets.all(16),
+                                                  child: Align(
+                                                    alignment: Alignment.bottomLeft,
+                                                    child: Column(
+                                                      mainAxisAlignment: MainAxisAlignment.end,
+                                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                                      children: [
+                                                        Text(
+                                                          title,
+                                                          style: const TextStyle(
+                                                            fontSize: 18,
+                                                            fontWeight: FontWeight.bold,
+                                                            color: Colors.white,
+                                                          ),
                                                         ),
-                                                      ),
-                                                      const SizedBox(height: 6),
-                                                      Text(
-                                                        order['date'] ?? '',
-                                                        style: TextStyle(
-                                                          color: Colors.white.withOpacity(0.9),
-                                                          fontSize: 12,
+                                                        const SizedBox(height: 6),
+                                                        Text(
+                                                          order['date'] ?? '',
+                                                          style: TextStyle(
+                                                            color: Colors.white.withOpacity(0.9),
+                                                            fontSize: 12,
+                                                          ),
                                                         ),
-                                                      ),
-                                                    ],
+                                                      ],
+                                                    ),
                                                   ),
                                                 ),
                                               ),
                                             ),
-                                          ),
-                                        ],
+                                          ],
+                                        ),
                                       ),
                                     ),
-                                  ),
-                                );
+                                  );
+                                } else {
+                                  // Show shimmer at the bottom when loading more
+                                  return Padding(
+                                    padding: const EdgeInsets.all(16.0),
+                                    child: Center(
+                                      child: Shimmer.fromColors(
+                                        baseColor: Colors.grey[300]!,
+                                        highlightColor: Colors.grey[100]!,
+                                        child: Container(
+                                          height: 48,
+                                          width: 180,
+                                          decoration: BoxDecoration(
+                                            color: Colors.white,
+                                            borderRadius: BorderRadius.circular(16),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  );
+                                }
                               },
                             ),
                 ),

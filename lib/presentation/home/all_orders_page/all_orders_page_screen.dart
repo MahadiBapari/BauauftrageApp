@@ -677,12 +677,23 @@ class _AllOrdersPageScreenState extends State<AllOrdersPageScreen> {
                               itemCount: _filteredOrders.length + (_hasMoreOrders ? 1 : 0),
                               itemBuilder: (context, index) {
                                 if (index == _filteredOrders.length) {
-                                  return _isFetchingMore
-                                      ? const CustomLoadingIndicator(
-                                              size: 30.0,
-                                              message: 'Mehr wird geladen...',
-                                            )
-                                          : const SizedBox.shrink();
+                                  return Padding(
+                                    padding: const EdgeInsets.all(16.0),
+                                    child: Center(
+                                      child: Shimmer.fromColors(
+                                        baseColor: Colors.grey[300]!,
+                                        highlightColor: Colors.grey[100]!,
+                                        child: Container(
+                                          height: 48,
+                                          width: 180,
+                                          decoration: BoxDecoration(
+                                            color: Colors.white,
+                                            borderRadius: BorderRadius.circular(16),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  );
                                 }
 
                                 final order = _filteredOrders[index];
