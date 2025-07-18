@@ -10,6 +10,7 @@ import '../../../widgets/custom_loading_indicator.dart';
 import '../../../utils/cache_manager.dart'; // Assuming you have this Utility
 import 'package:bauauftrage/common/utils/auth_utils.dart';
 import 'package:shimmer/shimmer.dart';
+import '../main_screen.dart'; // Assuming you have this screen
 
 class MyOrdersPageScreen extends StatefulWidget {
   const MyOrdersPageScreen({super.key});
@@ -250,6 +251,17 @@ class _MyOrdersPageScreenState extends State<MyOrdersPageScreen> {
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () {
+            Navigator.of(context).pushAndRemoveUntil(
+              MaterialPageRoute(
+                builder: (context) => MainScreen(role: 'um_client'),
+              ),
+              (Route<dynamic> route) => false,
+            );
+          },
+        ),
         title: const Text("Meine Aufträge",
           style: TextStyle(
             fontSize: 20,

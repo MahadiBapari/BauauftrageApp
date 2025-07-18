@@ -7,6 +7,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:multi_select_flutter/multi_select_flutter.dart';
 import 'package:path/path.dart' as path;
 import 'package:shared_preferences/shared_preferences.dart'; 
+import '../my_order_page/my_order_page_screen.dart';
 
 class AddNewOrderPageScreen extends StatefulWidget {
   final String? initialCategoryId;
@@ -254,6 +255,12 @@ final Map<String, dynamic> postData = {
               ),
             ],
           ),
+        );
+
+        // After dialog is closed, navigate to MyOrdersPageScreen
+        if (!mounted) return;
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (_) => MyOrdersPageScreen()),
         );
 
         // Reset the form fields managed by _formKey
