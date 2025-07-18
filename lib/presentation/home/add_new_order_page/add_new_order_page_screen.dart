@@ -130,7 +130,7 @@ Future<List<int>> uploadImages(List<File> imageFiles) async {
         final mediaId = data['id'];
         uploadedIds.add(mediaId);
       } else {
-        print('Image upload failed with status ${response.statusCode}: $responseBody');
+        print('Bild-Upload fehlgeschlagen');
       }
     } catch (e) {
       print('Exception during image upload for ${imageFile.path}: $e');
@@ -225,8 +225,7 @@ final Map<String, dynamic> postData = {
               borderRadius: BorderRadius.circular(16),
             ),
             title: Row(
-              children: const [
-                Icon(Icons.check_circle, color: Colors.green, size: 28),
+              children: const [              
                 SizedBox(width: 8),
                 Text(
                   'Auftrag übermittelt',

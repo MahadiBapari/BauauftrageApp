@@ -303,12 +303,12 @@ class _ProfilePageState extends State<ProfilePageScreenClient> {
               Icon(Icons.lock_reset, size: 48, color: Color.fromARGB(255, 185, 7, 7)),
               const SizedBox(height: 16),
               const Text(
-                'Passwort zruggsetze',
+                'Passwort zurücksetzen',
                 style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 10),
               const Text(
-                'Gib dis neus Passwort i.',
+                'Gib dein neues Passwort ein.',
                 textAlign: TextAlign.center,
                 style: TextStyle(fontSize: 16, color: Colors.black87),
               ),
@@ -317,7 +317,7 @@ class _ProfilePageState extends State<ProfilePageScreenClient> {
                 controller: newController,
                 obscureText: true,
                 decoration: const InputDecoration(
-                  labelText: 'Neus Passwort',
+                  labelText: 'Neues Passwort',
                   border: OutlineInputBorder(),
                   contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                 ),
@@ -327,7 +327,7 @@ class _ProfilePageState extends State<ProfilePageScreenClient> {
                 controller: confirmController,
                 obscureText: true,
                 decoration: const InputDecoration(
-                  labelText: 'Neus Passwort bestätige',
+                  labelText: 'Neues Passwort bestätigen',
                   border: OutlineInputBorder(),
                   contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                 ),
@@ -365,7 +365,7 @@ class _ProfilePageState extends State<ProfilePageScreenClient> {
                         final confirm = confirmController.text.trim();
                         if (newPass != confirm) {
                           Navigator.of(ctx).pop();
-                          _showError('Passwords do not match.');
+                          _showError('Passwörter stimmen nicht überein.');
                           return;
                         }
                         final prefs = await SharedPreferences.getInstance();
@@ -373,7 +373,7 @@ class _ProfilePageState extends State<ProfilePageScreenClient> {
                         final userId = prefs.getString('user_id');
                         if (token == null || userId == null) {
                           Navigator.of(ctx).pop();
-                          _showError('Not authenticated.');
+                          _showError('Nicht authentifiziert.');
                           return;
                         }
                         
@@ -389,16 +389,16 @@ class _ProfilePageState extends State<ProfilePageScreenClient> {
                           }));
                           Navigator.of(ctx).pop();
                           if (response.statusCode == 200) {
-                            _showError('Password changed successfully.');
+                            _showError('Passwort erfolgreich geändert.');
                           } else {
-                            _showError('Failed to change password: \\n${response.body}');
+                            _showError('Passwort nicht geändert.');
                           }
                         } catch (e) {
                           Navigator.of(ctx).pop();
                           _showError('Error: $e');
                         }
                       },
-                      child: const Text('Zruggsetze', style: TextStyle(fontSize: 16, color: Colors.white)),
+                      child: const Text('Zurücksetzen', style: TextStyle(fontSize: 16, color: Colors.white)),
                     ),
                   ),
                 ],

@@ -378,7 +378,7 @@ class _HomePageScreenClientState extends State<HomePageScreenClient> with Automa
           if (mounted) {
             setState(() {
               _orders = orders;
-              _isLoadingOrders = false;
+              _isLoadingOrders = true;
             });
           }
           return;
