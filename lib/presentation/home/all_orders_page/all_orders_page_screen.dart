@@ -198,24 +198,24 @@ class _AllOrdersPageScreenState extends State<AllOrdersPageScreen> {
 
   // New method to load more orders for pagination
   Future<void> _loadMoreOrders() async {
-    if (_isFetchingMore || !_hasMoreOrders) { // No need for _userId here as it's not a user-specific order list
-      debugPrint("Skipping loadMoreOrders. isFetchingMore: $_isFetchingMore, hasMoreOrders: $_hasMoreOrders");
-      return;
+    if (_isFetchingMore || !_hasMoreOrders) return;
+
+    setState(() {
+      _isFetchingMore = true;
+    });
+
+    final nextPage = _currentPage + 1;
+    final prevOrderCount = _orders.length;
+    await _fetchOrders(page: nextPage, perPage: _perPage, append: true);
+
+    // Only increment _currentPage if new orders were actually fetched
+    if (_orders.length > prevOrderCount) {
+      _currentPage = nextPage;
     }
 
-    if (mounted) {
-      setState(() {
-        _isFetchingMore = true;
-      });
-    }
-    _currentPage++;
-    await _fetchOrders(page: _currentPage, perPage: _perPage, append: true);
-
-    if (mounted) {
-      setState(() {
-        _isFetchingMore = false;
-      });
-    }
+    setState(() {
+      _isFetchingMore = false;
+    });
   }
 
   Future<void> _fetchOrders({required int page, required int perPage, required bool append}) async {
@@ -223,11 +223,10 @@ class _AllOrdersPageScreenState extends State<AllOrdersPageScreen> {
     if (!await isUserAuthenticated()) return;
 
     if (!append) {
-      // For a new fetch (not pagination), we should show a full loading indicator.
       if (mounted) {
         setState(() {
           _isLoadingOrders = true;
-          _filteredOrders.clear(); // Clear existing to show loader
+          _filteredOrders.clear();
         });
       }
     }
@@ -236,8 +235,6 @@ class _AllOrdersPageScreenState extends State<AllOrdersPageScreen> {
     debugPrint('AllOrdersPageScreen: Fetching orders for page $page, append: $append');
     try {
       final headers = <String, String>{};
-      
-      // Add category filter to API call if a category is selected
       String url = '$ordersEndpoint?page=$page&per_page=$perPage';
       if (_selectedCategoryId != null) {
         url += '&order-categories=$_selectedCategoryId';
@@ -279,18 +276,18 @@ class _AllOrdersPageScreenState extends State<AllOrdersPageScreen> {
               // Prevent duplicates by ID
               final existingIds = _orders.map((o) => o['id']).toSet();
               final newOrders = currentFetchedOrders.where((o) => !existingIds.contains(o['id'])).toList();
-              _orders.addAll(newOrders); // Append only unique orders
+              _orders.addAll(newOrders);
               debugPrint('Appended ${newOrders.length} new orders');
             } else {
-              _orders = currentFetchedOrders; // Overwrite for initial load/refresh
-              _currentPage = 1; // Reset current page for fresh fetch
-              _cacheManager.saveToCache('all_orders', currentFetchedOrders); // Save to cache
+              _orders = currentFetchedOrders;
+              _currentPage = 1;
+              _cacheManager.saveToCache('all_orders', currentFetchedOrders);
               debugPrint('AllOrdersPageScreen: Orders cached.');
               debugPrint('Appended ${currentFetchedOrders.length} new orders');
             }
             debugPrint('Total loaded: ${_orders.length}');
-            _hasMoreOrders = data.length == _perPage; // Check if more pages exist
-            _filterOrders(); // <--- Call filterOrders after _orders is updated
+            _hasMoreOrders = data.length == _perPage;
+            _filterOrders();
           });
         }
       } else {
@@ -298,7 +295,6 @@ class _AllOrdersPageScreenState extends State<AllOrdersPageScreen> {
         if (mounted) {
           setState(() {
             _hasMoreOrders = false;
-            // Clear orders if API call failed completely, preventing old data from showing
             if (!append) {
               _orders.clear();
               _filteredOrders.clear();
@@ -311,7 +307,6 @@ class _AllOrdersPageScreenState extends State<AllOrdersPageScreen> {
       if (mounted) {
         setState(() {
           _hasMoreOrders = false;
-          // Clear orders on network error
           if (!append) {
             _orders.clear();
             _filteredOrders.clear();
@@ -319,7 +314,6 @@ class _AllOrdersPageScreenState extends State<AllOrdersPageScreen> {
         });
       }
     } finally {
-      // ALWAYS ensure loading state is set to false, even on error or success.
       if (mounted && !append) {
         setState(() {
           _isLoadingOrders = false;
