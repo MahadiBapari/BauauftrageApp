@@ -386,7 +386,10 @@ class _HomePageScreenClientState extends State<HomePageScreenClient> with Automa
       }
 
       // Always fetch fresh data if forceRefresh is true or cache is empty
-      final response = await SafeHttp.safeGet(context, Uri.parse('https://xn--bauauftrge24-ncb.ch/wp-json/wp/v2/client-order'));
+      final response = await SafeHttp.safeGet(
+        context,
+        Uri.parse('https://xn--bauauftrge24-ncb.ch/wp-json/wp/v2/client-order?author=$currentUserId'),
+      );
 
       if (!mounted) return;
 
@@ -411,17 +414,9 @@ class _HomePageScreenClientState extends State<HomePageScreenClient> with Automa
           ));
         }
 
-        // Filter by current user
-        List<Order> userOrders = fetchedOrders.where((order) {
-          if (order.fullOrder != null && currentUserId != null) {
-            return order.fullOrder!['author'] == currentUserId;
-          }
-          return false;
-        }).toList();
-
         if (mounted) {
           setState(() {
-            _orders = userOrders;
+            _orders = fetchedOrders;
             _isLoadingOrders = false;
           });
         }
