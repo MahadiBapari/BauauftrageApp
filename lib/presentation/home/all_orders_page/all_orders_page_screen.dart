@@ -650,6 +650,8 @@ class _AllOrdersPageScreenState extends State<AllOrdersPageScreen> {
               // Orders List
               Expanded(
                 child: RefreshIndicator(
+                  color: const Color.fromARGB(255, 160, 36, 36),
+                  backgroundColor: const Color.fromARGB(255, 255, 255, 255),
                   onRefresh: _onRefresh,
                   child: _isLoadingOrders && _filteredOrders.isEmpty
                       ? Shimmer.fromColors(

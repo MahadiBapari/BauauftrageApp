@@ -452,6 +452,8 @@ class _HomePageScreenClientState extends State<HomePageScreenClient> with Automa
       backgroundColor: Colors.white,
       body: SafeArea(
         child: RefreshIndicator(
+          color: const Color.fromARGB(255, 179, 21, 21),
+          backgroundColor: const Color.fromARGB(255, 255, 255, 255),
           onRefresh: _onRefresh,
           child: SizedBox(
             height: MediaQuery.of(context).size.height - 200,

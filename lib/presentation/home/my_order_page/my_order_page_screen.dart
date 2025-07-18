@@ -333,6 +333,8 @@ class _MyOrdersPageScreenState extends State<MyOrdersPageScreen> {
               const SizedBox(height: 10),
               Expanded(
                 child: RefreshIndicator(
+                  color: const Color.fromARGB(255, 160, 36, 36),
+                  backgroundColor: const Color.fromARGB(255, 255, 255, 255),
                   onRefresh: _onRefresh,
                   child: _isLoadingOrders && _filteredOrders.isEmpty
                       ? ListView.separated(
