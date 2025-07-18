@@ -7,6 +7,7 @@ import 'package:bauauftrage/core/network/safe_http.dart';
 import 'package:bauauftrage/common/utils/auth_utils.dart';
 import 'package:shimmer/shimmer.dart';
 import 'membership_form_page_screen.dart'; 
+import 'package:flutter_stripe/flutter_stripe.dart' hide Card;
 
 class MyMembershipPageScreen extends StatefulWidget {
   const MyMembershipPageScreen({super.key});
@@ -26,6 +27,10 @@ class _MyMembershipPageScreenState extends State<MyMembershipPageScreen> {
   final String _membershipEndpoint = 'https://xn--bauauftrge24-ncb.ch/wp-json/custom-api/v1/user-membership';
   final String _cancelMembershipEndpoint = 'https://xn--bauauftrge24-ncb.ch/wp-json/custom-api/v1/cancel-membership'; 
   final String _apiKey = '1234567890abcdef'; 
+
+  CardFieldInputDetails? _renewCard;
+  bool _isRenewProcessing = false;
+  bool _renewAgreeToTerms = false;
 
   @override
   void initState() {
@@ -289,6 +294,143 @@ class _MyMembershipPageScreenState extends State<MyMembershipPageScreen> {
     }
   }
 
+  void _showRenewModal() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (context) => Padding(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.of(context).viewInsets.bottom,
+        ),
+        child: StatefulBuilder(
+          builder: (context, setModalState) {
+            return Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 50),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        'Zahlungsinformation für Verlängerung',
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: Color.fromARGB(255, 0, 0, 0)),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close),
+                        onPressed: () => Navigator.pop(context),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  CardFormField(
+                    style: CardFormStyle(
+                      backgroundColor: Colors.white,
+                      textColor: Colors.black,
+                      placeholderColor: Colors.grey,
+                    ),
+                    onCardChanged: (card) {
+                      setModalState(() {
+                        _renewCard = card;
+                      });
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Checkbox(
+                        value: _renewAgreeToTerms,
+                        onChanged: (val) => setModalState(() => _renewAgreeToTerms = val ?? false),
+                        activeColor: const Color.fromARGB(255, 185, 33, 33),
+                      ),
+                      const Expanded(
+                        child: Text('Ich stimme den Allgemeinen Geschäftsbedingungen zu.', style: TextStyle(color: Colors.black)),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: (_renewCard != null && _renewCard!.complete && _renewAgreeToTerms && !_isRenewProcessing)
+                          ? () async {
+                              Navigator.pop(context); // Close modal
+                              await _handleRenewMembership();
+                            }
+                          : null,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color.fromARGB(255, 185, 33, 33),
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        padding: const EdgeInsets.symmetric(vertical: 18),
+                        textStyle: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                        elevation: 2,
+                      ),
+                      child: _isRenewProcessing
+                          ? const SizedBox(
+                              height: 24,
+                              width: 24,
+                              child: CircularProgressIndicator(color: Colors.white, strokeWidth: 3),
+                            )
+                          : const Text('Mitgliedschaft verlängern'),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  Future<void> _handleRenewMembership() async {
+    setState(() => _isRenewProcessing = true);
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final userEmail = prefs.getString('user_email');
+      if (userEmail == null) throw Exception('Benutzer-Email nicht gefunden.');
+      // 1. Create Stripe payment method
+      final paymentMethod = await Stripe.instance.createPaymentMethod(
+        params: PaymentMethodParams.card(
+          paymentMethodData: PaymentMethodData(
+            billingDetails: BillingDetails(email: userEmail),
+          ),
+        ),
+      );
+      // 2. Call renew API
+      final response = await http.post(
+        Uri.parse('https://xn--bauauftrge24-ncb.ch/wp-json/custom-api/v1/pmpro-renew'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'email': userEmail,
+          'payment_method_id': paymentMethod.id,
+        }),
+      );
+      final data = jsonDecode(response.body);
+      if (response.statusCode == 200 && data['success'] == true) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Mitgliedschaft erneuert bis ${data['new_expiry']}')),
+        );
+        _fetchMembershipDetails();
+      } else {
+        throw Exception(data['error'] ?? 'Erneuerung fehlgeschlagen.');
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('❌ Fehler: $e')),
+      );
+    } finally {
+      setState(() => _isRenewProcessing = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -526,20 +668,7 @@ class _MyMembershipPageScreenState extends State<MyMembershipPageScreen> {
                 Row(
                   children: [
                     TextButton(
-                      onPressed: () {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: const Text('Renew button pressed!'),
-                            backgroundColor: const Color.fromARGB(129, 0, 0, 0),
-                            behavior: SnackBarBehavior.floating,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            margin: const EdgeInsets.all(10),
-                          ),
-                        );
-                        // TODO: Implement actual renew logic here 
-                      },
+                      onPressed: _showRenewModal,
                       style: TextButton.styleFrom(
                         foregroundColor: const Color.fromARGB(255, 185, 33, 33),
                         padding: EdgeInsets.zero,
