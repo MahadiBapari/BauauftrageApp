@@ -8,6 +8,7 @@ import 'package:photo_view/photo_view_gallery.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:bauauftrage/utils/cache_manager.dart';
 import 'package:bauauftrage/core/network/safe_http.dart';
+import 'package:shimmer/shimmer.dart';
 
 
 
@@ -451,10 +452,15 @@ return Scaffold(
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Container(
-          height: MediaQuery.of(context).size.height * 0.5,
-          width: double.infinity,
-          color: Colors.grey[300],
+        Shimmer.fromColors(
+          baseColor: Colors.grey[300]!,
+          highlightColor: Colors.grey[100]!,
+          period: const Duration(milliseconds: 1200),
+          child: Container(
+            height: MediaQuery.of(context).size.height * 0.5,
+            width: double.infinity,
+            color: Colors.white,
+          ),
         ),
         Expanded(
           child: Container(
@@ -465,17 +471,22 @@ return Scaffold(
             ),
             child: Padding(
               padding: const EdgeInsets.all(24),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(height: 18, width: 120, color: Colors.grey[300]),
-                  const SizedBox(height: 16),
-                  Container(height: 24, width: 200, color: Colors.grey[300]),
-                  const SizedBox(height: 24),
-                  Container(height: 16, width: double.infinity, color: Colors.grey[300]),
-                  const SizedBox(height: 8),
-                  Container(height: 16, width: double.infinity, color: Colors.grey[300]),
-                ],
+              child: Shimmer.fromColors(
+                baseColor: Colors.grey[300]!,
+                highlightColor: Colors.grey[100]!,
+                period: const Duration(milliseconds: 1200),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(height: 18, width: 120, color: Colors.white),
+                    const SizedBox(height: 16),
+                    Container(height: 24, width: 200, color: Colors.white),
+                    const SizedBox(height: 24),
+                    Container(height: 16, width: double.infinity, color: Colors.white),
+                    const SizedBox(height: 8),
+                    Container(height: 16, width: double.infinity, color: Colors.white),
+                  ],
+                ),
               ),
             ),
           ),

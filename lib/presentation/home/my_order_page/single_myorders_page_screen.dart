@@ -10,6 +10,7 @@ import 'edit_order_page_screen.dart';
 import 'package:bauauftrage/utils/cache_manager.dart';
 import 'package:bauauftrage/core/network/safe_http.dart';
 import 'package:bauauftrage/common/utils/auth_utils.dart';
+import 'package:shimmer/shimmer.dart';
 
 class SingleMyOrderPageScreen extends StatefulWidget {
   final Map<String, dynamic> order;
@@ -105,46 +106,66 @@ class _SingleMyOrderPageScreenState extends State<SingleMyOrderPageScreen> {
         return;
       }
 
-      // Now use the updated _currentOrderData for subsequent fetches
-      final authorId = _currentOrderData['author'];
-      final dynamic galleryDynamic = _currentOrderData['meta']?['order_gallery'];
-      final List<dynamic> rawCategoryIds = _currentOrderData['order-categories'] ?? [];
-
-      List<int> galleryImageIds = [];
-      if (galleryDynamic is List) {
-        galleryImageIds = galleryDynamic
-            .whereType<Map>()
-            .map((item) => item['id'])
-            .whereType<int>()
-            .toList();
-      } else if (galleryDynamic is String) {
-        try {
-          final decodedContent = jsonDecode(galleryDynamic);
-          if (decodedContent is List) {
-            galleryImageIds = decodedContent
-                .whereType<Map>()
-                .map((item) => item['id'])
-                .whereType<int>()
-                .toList();
-          } else {
-            debugPrint('SingleMyOrderPageScreen: galleryDynamic is a String, but not a JSON list: $galleryDynamic');
+      // --- CDN IMAGE LOGIC ---
+      List<String> imageUrls = [];
+      final cdnGallery = _currentOrderData['order_gallery_cdn'];
+      if (cdnGallery != null && cdnGallery is List && cdnGallery.isNotEmpty) {
+        for (var img in cdnGallery) {
+          if (img is Map && img['cdn_url'] != null) {
+            imageUrls.add(img['cdn_url']);
+          } else if (img is Map && img['original_url'] != null) {
+            imageUrls.add(img['original_url']);
           }
-        } catch (e) {
-          debugPrint('SingleMyOrderPageScreen: Could not parse gallery string as JSON: $e, original string: $galleryDynamic');
         }
       } else {
-        debugPrint('SingleMyOrderPageScreen: order_gallery is neither List nor String type: ${galleryDynamic.runtimeType}');
+        // Fallback to old gallery logic if no CDN
+        final dynamic galleryDynamic = _currentOrderData['meta']?['order_gallery'];
+        List<int> galleryImageIds = [];
+        if (galleryDynamic is List) {
+          galleryImageIds = galleryDynamic
+              .whereType<Map>()
+              .map((item) => item['id'])
+              .whereType<int>()
+              .toList();
+        } else if (galleryDynamic is String) {
+          try {
+            final decodedContent = jsonDecode(galleryDynamic);
+            if (decodedContent is List) {
+              galleryImageIds = decodedContent
+                  .whereType<Map>()
+                  .map((item) => item['id'])
+                  .whereType<int>()
+                  .toList();
+            } else {
+              debugPrint('SingleMyOrderPageScreen: galleryDynamic is a String, but not a JSON list: $galleryDynamic');
+            }
+          } catch (e) {
+            debugPrint('SingleMyOrderPageScreen: Could not parse gallery string as JSON: $e, original string: $galleryDynamic');
+          }
+        } else {
+          debugPrint('SingleMyOrderPageScreen: order_gallery is neither List nor String type: \\${galleryDynamic.runtimeType}');
+        }
+        // Fetch media URLs if no CDN
+        for (int mediaId in galleryImageIds) {
+          final mediaResponse = await SafeHttp.safeGet(context, Uri.parse('$mediaUrlBase$mediaId'), headers: {'X-API-KEY': apiKey});
+          if (mediaResponse.statusCode == 200) {
+            final mediaData = jsonDecode(mediaResponse.body);
+            final imageUrl = mediaData['source_url'];
+            if (imageUrl != null) imageUrls.add(imageUrl);
+          } else {
+            debugPrint('SingleMyOrderPageScreen: Failed to fetch media for ID $mediaId: ${mediaResponse.statusCode}');
+          }
+        }
       }
+      // --- END CDN IMAGE LOGIC ---
 
+      final authorId = _currentOrderData['author'];
+      final List<dynamic> rawCategoryIds = _currentOrderData['order-categories'] ?? [];
 
       List<Future<dynamic>> futures = [
         SafeHttp.safeGet(context, Uri.parse('$usersApiBaseUrl$authorId'), headers: {'X-API-KEY': apiKey}),
         SafeHttp.safeGet(context, Uri.parse(categoriesUrl)),
       ];
-
-      for (int mediaId in galleryImageIds) {
-        futures.add(SafeHttp.safeGet(context, Uri.parse('$mediaUrlBase$mediaId'), headers: {'X-API-KEY': apiKey}));
-      }
 
       List<dynamic> responses = await Future.wait(futures);
 
@@ -153,7 +174,7 @@ class _SingleMyOrderPageScreenState extends State<SingleMyOrderPageScreen> {
       if (userResponse.statusCode == 200) {
         user = jsonDecode(userResponse.body);
       } else {
-        debugPrint('SingleMyOrderPageScreen: Failed to fetch user: ${userResponse.statusCode} ${userResponse.body}');
+        debugPrint('SingleMyOrderPageScreen: Failed to fetch user: \\${userResponse.statusCode} \\${userResponse.body}');
       }
 
       final http.Response categoriesResponse = responses[1];
@@ -166,19 +187,7 @@ class _SingleMyOrderPageScreenState extends State<SingleMyOrderPageScreen> {
           }
         }
       } else {
-        debugPrint('SingleMyOrderPageScreen: Failed to fetch categories: ${categoriesResponse.statusCode} ${categoriesResponse.body}');
-      }
-
-      List<String> imageUrls = [];
-      for (int i = 2; i < responses.length; i++) {
-        final mediaResponse = responses[i];
-        if (mediaResponse.statusCode == 200) {
-          final mediaData = jsonDecode(mediaResponse.body);
-          final imageUrl = mediaData['source_url'];
-          if (imageUrl != null) imageUrls.add(imageUrl);
-        } else {
-          debugPrint('SingleMyOrderPageScreen: Failed to fetch media for ID ${galleryImageIds[i - 2]}: ${mediaResponse.statusCode}');
-        }
+        debugPrint('SingleMyOrderPageScreen: Failed to fetch categories: \\${categoriesResponse.statusCode} \\${categoriesResponse.body}');
       }
 
       List<String> orderCategories = [];
@@ -501,12 +510,22 @@ class _SingleMyOrderPageScreenState extends State<SingleMyOrderPageScreen> {
                               },
                               child: Hero(
                                 tag: _imageUrls[index],
-                                child: CachedNetworkImage(
-                                  imageUrl: _imageUrls[index],
+                                child: Image.network(
+                                  _imageUrls[index],
                                   fit: BoxFit.cover,
-                                  placeholder: (_, __) =>
-                                      const Center(child: CircularProgressIndicator()),
-                                  errorWidget: (_, __, ___) =>
+                                  loadingBuilder: (context, child, loadingProgress) {
+                                    if (loadingProgress == null) return child;
+                                    return Center(
+                                      child: CircularProgressIndicator(
+                                        color: Color.fromARGB(255, 179, 21, 21),
+                                        value: loadingProgress.expectedTotalBytes != null
+                                            ? loadingProgress.cumulativeBytesLoaded /
+                                                loadingProgress.expectedTotalBytes!
+                                            : null,
+                                      ),
+                                    );
+                                  },
+                                  errorBuilder: (_, __, ___) =>
                                       const Icon(Icons.broken_image, size: 40),
                                 ),
                               ),
@@ -615,10 +634,15 @@ class _SingleMyOrderPageScreenState extends State<SingleMyOrderPageScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Container(
-          height: MediaQuery.of(context).size.height * 0.5,
-          width: double.infinity,
-          color: Colors.grey[300],
+        Shimmer.fromColors(
+          baseColor: Colors.grey[300]!,
+          highlightColor: Colors.grey[100]!,
+          period: const Duration(milliseconds: 1200),
+          child: Container(
+            height: MediaQuery.of(context).size.height * 0.5,
+            width: double.infinity,
+            color: Colors.white,
+          ),
         ),
         Expanded(
           child: Container(
@@ -629,17 +653,22 @@ class _SingleMyOrderPageScreenState extends State<SingleMyOrderPageScreen> {
             ),
             child: Padding(
               padding: const EdgeInsets.all(24),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(height: 18, width: 120, color: Colors.grey[300]),
-                  const SizedBox(height: 16),
-                  Container(height: 24, width: 200, color: Colors.grey[300]),
-                  const SizedBox(height: 24),
-                  Container(height: 16, width: double.infinity, color: Colors.grey[300]),
-                  const SizedBox(height: 8),
-                  Container(height: 16, width: double.infinity, color: Colors.grey[300]),
-                ],
+              child: Shimmer.fromColors(
+                baseColor: Colors.grey[300]!,
+                highlightColor: Colors.grey[100]!,
+                period: const Duration(milliseconds: 1200),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(height: 18, width: 120, color: Colors.white),
+                    const SizedBox(height: 16),
+                    Container(height: 24, width: 200, color: Colors.white),
+                    const SizedBox(height: 24),
+                    Container(height: 16, width: double.infinity, color: Colors.white),
+                    const SizedBox(height: 8),
+                    Container(height: 16, width: double.infinity, color: Colors.white),
+                  ],
+                ),
               ),
             ),
           ),
