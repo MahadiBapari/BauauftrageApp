@@ -48,6 +48,7 @@ dependencies:
   extended_image: ^8.2.0
   app_links: ^6.4.0
   flutter_stripe: ^11.5.0
+  upgrader: ^11.4.0
   
  
 
