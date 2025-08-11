@@ -192,8 +192,14 @@ class _SingleMyOrderPageScreenState extends State<SingleMyOrderPageScreen> {
 
       List<String> orderCategories = [];
       for (var id in rawCategoryIds) {
+        int? intId;
         if (id is int) {
-          orderCategories.add(categoryMap[id] ?? 'Unknown Category');
+          intId = id;
+        } else if (id is String) {
+          intId = int.tryParse(id);
+        }
+        if (intId != null) {
+          orderCategories.add(categoryMap[intId] ?? 'Unknown Category');
         }
       }
 
