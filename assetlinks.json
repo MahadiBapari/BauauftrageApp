@@ -1,9 +1,12 @@
-[{
-  "relation": ["delegate_permission/common.handle_all_urls"],
-  "target": {
-    "namespace": "android_app",
-    "package_name": "com.example.bauauftrageapp",
-    "sha256_cert_fingerprints":
-    ["BE:48:DA:34:20:E8:D0:09:DE:25:54:F3:34:B3:1C:74:88:24:37:47:9F:D5:94:4C:AE:A2:13:3E:81:89:DD:CA"]
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.bauauftrage.app",
+      "sha256_cert_fingerprints": [
+        "30:87:EC:66:B8:8D:59:57:8E:B7:A3:81:09:A8:81:F7:60:CC:3A:AB:85:19:5D:E9:D5:38:77:73:F8:33:3C:BF"
+      ]
+    }
   }
-}]
+]

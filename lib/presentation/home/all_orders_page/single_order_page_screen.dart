@@ -170,15 +170,24 @@ class _SingleOrderPageScreenState extends State<SingleOrderPageScreen> {
       }
     }
 
+String _sanitizePhoneNumber(String input) {
+  final sanitized = input.replaceAll(RegExp(r"[^0-9+]"), '');
+  return sanitized;
+}
+
 Future<void> launchPhone(String phoneNumber) async {
   if (phoneNumber.isEmpty || phoneNumber == 'N/A') {
     print("Invalid phone number: $phoneNumber");
     return;
   }
 
-  final Uri phoneUri = Uri(scheme: 'tel', path: phoneNumber);
+  final String sanitized = _sanitizePhoneNumber(phoneNumber);
+  final Uri phoneUri = Uri(scheme: 'tel', path: sanitized);
   if (await canLaunchUrl(phoneUri)) {
-    await launchUrl(phoneUri);
+    await launchUrl(
+      phoneUri,
+      mode: LaunchMode.externalApplication,
+    );
   } else {
     print("Could not launch phone call");
   }
@@ -197,7 +206,10 @@ Future<void> launchEmail(String email) async {
   );
 
   if (await canLaunchUrl(emailUri)) {
-    await launchUrl(emailUri);
+    await launchUrl(
+      emailUri,
+      mode: LaunchMode.externalApplication,
+    );
   } else {
     print("Could not launch email");
   }
